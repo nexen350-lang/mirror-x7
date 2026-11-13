@@ -1,0 +1,6 @@
+{
+  "name": "Scrcpy Client Repository Packager",
+  "description": "حزمة المستودع المنظمة لتطبيق Scrcpy Android (المراحل 1 إلى 6) مع GitHub Actions لبناء APK ونشر Release تلقائياً.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
