@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_info_title">App info</string>
+    <string name="app_info_summary">Version, privacy policy and open-source licenses</string>
+    <string name="app_info_independent">An independent open-source client for viewing and controlling devices you own or are authorized to use. Not affiliated with Genymobile, the scrcpy authors, or Google.</string>
+    <string name="app_info_version">Version</string>
+    <string name="app_info_version_value">%1$s (build %2$d)</string>
+    <string name="app_info_package">Application ID</string>
+    <string name="app_info_build">Build type</string>
+    <string name="app_info_server">Bundled scrcpy server</string>
+    <string name="app_info_back_to_settings">Back to Settings</string>
+    <string name="app_info_developer">Developer</string>
+    <string name="app_info_contact">Contact</string>
+    <string name="app_info_legal">Privacy and legal</string>
+    <string name="app_info_privacy_policy">Privacy policy</string>
+    <string name="app_info_privacy_policy_detail">What the app handles and where it goes</string>
+    <string name="app_info_licenses">Open-source licenses</string>
+    <string name="app_info_licenses_detail">The software this app includes and its licenses</string>
+    <string name="app_info_view_online">View online</string>
+    <string name="app_info_back">Back</string>
+    <string name="app_info_load_failed">Could not load this content.</string>
+</resources>

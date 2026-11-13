@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- The first retry delay is one second, so the singular form is actually reachable. -->
+    <plurals name="recovery_waiting">
+        <item quantity="one">Connection lost. Reconnect %1$d of %2$d in %3$d second&#8230;</item>
+        <item quantity="other">Connection lost. Reconnect %1$d of %2$d in %3$d seconds&#8230;</item>
+    </plurals>
+    <string name="recovery_exhausted">Automatic retries stopped. Check the device and network, then retry manually.</string>
+    <string name="recovery_new_port">Trying the same host on advertised connection port %1$d. The saved address is unchanged.</string>
+    <string name="recovery_original_port">Port discovery could not select one safe match. Retrying the original connection address.</string>
+    <string name="recovery_kept_port">Port discovery could not select one safe match. Retrying port %1$d, which it found earlier.</string>
+</resources>

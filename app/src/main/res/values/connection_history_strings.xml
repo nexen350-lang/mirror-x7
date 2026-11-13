@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- A saved device's connection history, kept on this phone only. -->
+    <string name="connection_history_title">Connection history</string>
+    <plurals name="connection_history_repeated">
+        <item quantity="one">This has happened %1$d time in a row, since %2$s.</item>
+        <item quantity="other">This has happened %1$d times in a row, since %2$s.</item>
+    </plurals>
+    <string name="connection_history_last_connected">Last connected %1$s.</string>
+    <string name="connection_history_earlier">Earlier problems</string>
+    <!-- When it last happened, the step that failed, and how it failed. -->
+    <string name="connection_history_problem">%1$s · %2$s: %3$s</string>
+    <plurals name="connection_history_problem_repeated">
+        <item quantity="one">%1$s · %2$s: %3$s, %4$d time</item>
+        <item quantity="other">%1$s · %2$s: %3$s, %4$d times</item>
+    </plurals>
+    <string name="connection_history_outcome_refused">refused</string>
+    <string name="connection_history_outcome_no_answer">no answer</string>
+    <string name="connection_history_outcome_dropped">connection dropped</string>
+    <string name="connection_history_outcome_not_allowed">not allowed</string>
+    <string name="connection_history_outcome_pairing">needs pairing</string>
+    <string name="connection_history_outcome_protocol">unexpected reply</string>
+    <string name="connection_history_outcome_codec">video or input problem</string>
+    <string name="connection_history_outcome_setting">setting rejected</string>
+    <string name="connection_history_outcome_other">failed</string>
+    <string name="connection_history_none">Nothing recorded for this device yet.</string>
+    <string name="connection_history_never_connected">No successful connection recorded.</string>
+    <string name="connection_history_problems">Recent problems</string>
+    <string name="connection_history_no_problems">No connection problems recorded.</string>
+    <string name="connection_history_kept_here">Kept on this phone only: the last five problems and when the device last connected. Not included in backups.</string>
+    <string name="connection_history_clear">Clear history</string>
+</resources>

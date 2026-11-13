@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="checkup_title">Connection checkup</string>
+    <string name="checkup_stage_reach">Connect to %1$s</string>
+    <string name="checkup_stage_authorize">ADB authorization</string>
+    <string name="checkup_stage_deploy">Install the scrcpy server</string>
+    <string name="checkup_stage_start">Start the server and its streams</string>
+    <string name="checkup_stage_media">Receive video</string>
+    <string name="checkup_stage_session">Stay connected</string>
+    <string name="checkup_status_passed">Done</string>
+    <string name="checkup_status_passed_ms">Done in %1$d ms</string>
+    <string name="checkup_status_passed_timed">Done in %1$s s</string>
+    <string name="checkup_status_running">In progress</string>
+    <string name="checkup_status_failed">Failed</string>
+    <string name="checkup_status_failed_ms">Failed after %1$d ms</string>
+    <string name="checkup_status_failed_timed">Failed after %1$s s</string>
+    <string name="checkup_status_lost">Lost</string>
+    <string name="checkup_status_not_reached">Not reached</string>
+    <string name="checkup_next">Next: %1$s</string>
+    <string name="checkup_action_reach_refused">Turn on Wireless debugging (or adb tcpip) and use the connection port it shows now, not the pairing port.</string>
+    <string name="checkup_action_reach">Check the address, and that both devices are awake and on the same network.</string>
+    <string name="checkup_action_pair">Pair this phone first: on the device, open Wireless debugging and choose Pair device with pairing code.</string>
+    <string name="checkup_action_authorize">Unlock the device and accept the Allow debugging prompt for this phone.</string>
+    <string name="checkup_action_adb_port">Make sure this is the device\'s ADB connection port, then reconnect.</string>
+    <string name="checkup_action_deploy">Check that the device has free storage, then reconnect.</string>
+    <string name="checkup_action_start">Unlock the device and keep its screen on, then reconnect.</string>
+    <string name="checkup_action_setting">Change the setting the device rejected, shown in the details, then reconnect.</string>
+    <string name="checkup_action_session_setting">Go back to your devices and connect again: that uses the saved settings, without this session\'s choices.</string>
+    <string name="checkup_action_codec">Choose a different video codec or encoder for this device.</string>
+    <string name="checkup_action_network">Keep both devices awake and on the same network, then reconnect.</string>
+    <string name="checkup_action_reconnect">Reconnect once the connection is stable.</string>
+</resources>

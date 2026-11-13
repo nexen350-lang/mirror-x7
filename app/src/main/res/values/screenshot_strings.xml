@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="screenshot_error_not_ready">The remote video is not ready for a screenshot. Try again when video is playing.</string>
+    <string name="screenshot_error_memory">Not enough memory to capture this screenshot.</string>
+    <string name="screenshot_error_timeout">Screenshot capture timed out. Try again.</string>
+    <string name="screenshot_error_copy">Could not capture the remote video (PixelCopy error %1$d). Try again.</string>
+    <string name="screenshot_error_prepare">Could not prepare the screenshot. Check available storage and try again.</string>
+    <string name="screenshot_error_expired">This screenshot is no longer available. Capture another screenshot.</string>
+    <string name="screenshot_error_save">Could not save the screenshot. The selected destination may contain an incomplete image. Check it before trying again.</string>
+    <string name="screenshot_error_cleanup">Could not remove the private cached screenshot.</string>
+    <string name="artefact_share_title">Share</string>
+    <string name="artefact_share">Share</string>
+    <string name="artefact_share_failed">That file is no longer available to share.</string>
+</resources>

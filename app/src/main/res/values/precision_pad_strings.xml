@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="precision_pad_toggle">Precision pad</string>
+    <string name="precision_pad_toggle_label">Pad</string>
+    <string name="precision_pad_state_on">On</string>
+    <string name="precision_pad_state_off">Off</string>
+    <string name="precision_pad_hint">Slide to move the pointer. Tap to click at it. Two fingers scroll.</string>
+    <string name="precision_pad_drag">Hold to drag</string>
+    <string name="precision_pad_drag_label">Hold</string>
+    <string name="precision_pad_drop">Release</string>
+    <string name="precision_pad_drag_held">Press held</string>
+    <string name="precision_pad_drag_free">Not pressed</string>
+    <string name="precision_pad_speed">%1$s×</string>
+    <string name="precision_pad_speed_description">Pointer speed %1$s times. Tap for the next speed.</string>
+    <string name="precision_pad_exit">Direct</string>
+    <string name="precision_pad_exit_description">Leave the precision pad and touch the screen directly</string>
+    <string name="precision_pad_surface_description">Precision pad for %1$s. Slide to move the pointer and tap to click at it.</string>
+</resources>

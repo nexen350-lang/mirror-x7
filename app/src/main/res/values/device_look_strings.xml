@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- A saved device's look, chosen in the device editor. -->
+    <string name="device_look_heading">Look</string>
+    <string name="device_look_color">Color</string>
+    <string name="device_look_shows">Shows</string>
+    <string name="device_look_automatic">Automatic</string>
+    <string name="avatar_color_blue">Blue</string>
+    <string name="avatar_color_indigo">Indigo</string>
+    <string name="avatar_color_purple">Purple</string>
+    <string name="avatar_color_pink">Pink</string>
+    <string name="avatar_color_orange">Orange</string>
+    <string name="avatar_color_amber">Amber</string>
+    <string name="avatar_color_green">Green</string>
+    <string name="avatar_color_teal">Teal</string>
+    <string name="device_icon_initials">Initials</string>
+    <string name="device_icon_phone">Phone</string>
+    <string name="device_icon_tablet">Tablet</string>
+    <string name="device_icon_tv">TV</string>
+    <string name="device_icon_watch">Watch</string>
+    <string name="device_look_summary">%1$s · %2$s</string>
+    <string name="device_look_show">Show look choices</string>
+    <string name="device_look_hide">Hide look choices</string>
+
+    <!-- Removing a device from the list, with a moment to take it back. -->
+    <string name="device_removed">Removed %1$s</string>
+    <string name="device_list_remove_named">Remove %1$s</string>
+    <string name="undo">Undo</string>
+    <!-- Undo could not be written, so it is offered again. -->
+    <string name="device_restore_failed">Could not put %1$s back</string>
+    <string name="device_restore_retry">Try again</string>
+</resources>

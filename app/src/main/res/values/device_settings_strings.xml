@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="device_settings">Device settings</string>
+    <string name="device_settings_title">Device settings: %1$s</string>
+    <string name="device_settings_use_global">Use global settings</string>
+    <string name="device_settings_global_summary">Global settings</string>
+    <string name="device_settings_global_defaults">Global defaults</string>
+    <string name="device_settings_custom_summary">%1$d px · %2$d fps · %3$s</string>
+    <string name="device_settings_audio_on">Audio on</string>
+    <string name="device_settings_audio_off">Audio off</string>
+    <string name="device_settings_global_help">Uses the current global mirroring settings. Switch off to customize this device.</string>
+    <string name="device_settings_custom_help">Only this device uses these settings. Enable global settings and Save to reset this profile.</string>
+    <string name="device_settings_calibration_help">Touch calibration is saved separately for each orientation. Adjust it with Calibrate during a session.</string>
+    <string name="device_settings_reconnect_help">Saving does not change the running stream. Reconnect to apply these settings.</string>
+    <string name="device_settings_unsupported_codec">This phone has no decoder for %1$s. The saved choice is kept; select a supported codec before connecting.</string>
+</resources>

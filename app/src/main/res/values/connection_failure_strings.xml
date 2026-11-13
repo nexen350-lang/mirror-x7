@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="error_connection_refused">Turn on Wireless debugging on the other phone (%1$s). If you toggled it off and on, check the new connection port shown there.</string>
+    <string name="error_not_responding">The other phone (%1$s) did not answer in time. Make sure both phones are on the same Wi-Fi, unlock the other phone, and tap \"Allow\" if a debugging prompt appears.</string>
+</resources>

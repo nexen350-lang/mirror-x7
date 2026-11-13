@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="server_v50">scrcpy 5.0.1</string>
+    <string name="app_info_server_value">%1$s</string>
+    <string name="details_server">Server</string>
+    <string name="link_request_server">scrcpy server version %1$s</string>
+</resources>

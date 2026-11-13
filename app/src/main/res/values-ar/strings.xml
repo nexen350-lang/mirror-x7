@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:tools="http://schemas.android.com/tools" tools:ignore="MissingTranslation">
+    <!-- Pairing -->
+    <string name="pair_new_device">إقران جهاز جديد</string>
+    <string name="pair_title">الإقران مع جهاز</string>
+    <string name="pair_help">على الهاتف الآخر: افتح خيارات المطور ← تصحيح الأخطاء اللاسلكي ← إقران الجهاز برمز الإقران، ثم اختر الجهاز أدناه أو اكتب البيانات يدوياً.</string>
+    <string name="field_ip_address">عنوان IP</string>
+    <string name="field_pairing_port">بورت الإقران</string>
+    <string name="field_pairing_code">رمز الإقران (6 أرقام)</string>
+    <string name="pair">إقران</string>
+    <string name="pairing_in_progress">جارٍ الإقران…</string>
+    <string name="pair_success">تم الإقران مع %1$s. اتصل الآن باستخدام البورت الظاهر في تصحيح الأخطاء اللاسلكي.</string>
+    <string name="pair_failed">فشل الإقران</string>
+    <string name="pair_rejected">رفض الجهاز طلب الإقران. تأكد من الرمز وحاول مرة أخرى.</string>
+    <string name="pair_discovered_devices">الأجهزة القريبة</string>
+    <string name="pair_discovery_searching">جارٍ البحث عن أجهزة قريبة…</string>
+    <string name="pair_discovery_tap_hint">اضغط على الجهاز لتعبئة العنوان وبورت الإقران تلقائياً، ثم اكتب رمز الـ 6 أرقام.</string>
+    <string name="pair_discovery_none_found">لم يتم العثور على أجهزة قريبة. أدخل عنوان IP وبورت الإقران يدوياً.</string>
+    <string name="pair_discovery_unavailable">البحث التلقائي غير متاح حالياً. أدخل عنوان IP وبورت الإقران يدوياً.</string>
+    <string name="pair_discovery_retry">إعادة البحث</string>
+
+    <!-- Post-pairing auto-add -->
+    <string name="post_pair_searching_title">جارٍ إكمال الإعداد</string>
+    <string name="post_pair_searching_body">جارٍ البحث عن بورت الاتصال على %1$s…</string>
+    <string name="post_pair_confirm_title">هل تريد إضافة %1$s والاتصال به؟</string>
+    <string name="post_pair_confirm_body">تم إقران %1$s (%2$s) بنجاح. هل تريد حفظ الجهاز وبدء عرض الشاشة الآن؟</string>
+    <string name="post_pair_confirm_button">إضافة واتصال</string>
+
+    <!-- QR pairing -->
+    <string name="pair_with_qr">الإقران عبر رمز QR</string>
+    <string name="pair_qr_title">امسح رمز QR للإقران</string>
+    <string name="pair_qr_help">على الهاتف الآخر: خيارات المطور ← تصحيح الأخطاء اللاسلكي ← إقران الجهاز برمز QR، ثم امسح هذا الرمز.</string>
+    <string name="pair_qr_content_description">رمز QR للإقران بتصحيح الأخطاء اللاسلكي</string>
+    <string name="pair_qr_expires_in">في انتظار المسح (متبقي %1$d ث)…</string>
+    <string name="pair_qr_timeout">انتهت مهلة رمز QR. اضغط لإنشاء رمز جديد.</string>
+    <string name="pair_qr_try_again">إنشاء رمز QR جديد</string>
+
+    <!-- Stage 5: One-tap experience -->
+    <string name="quick_connect">اتصال سريع</string>
+    <string name="quick_connect_title">اتصال سريع</string>
+    <string name="quick_connect_help">اتصل فوراً بأفضل الإعدادات الافتراضية دون الحاجة لحفظ الجهاز أولاً.</string>
+    <string name="quick_connect_advanced">إعدادات متقدمة</string>
+    <string name="settings_startup_group">عند فتح التطبيق</string>
+    <string name="setting_reconnect_last_device">إعادة الاتصال بآخر جهاز تلقائياً</string>
+    <string name="setting_reconnect_last_device_help">عند التفعيل، يتصل التطبيق تلقائياً بآخر جهاز محفوظ اتصلت به عند فتح البرنامج.</string>
+    <string name="connect">اتصال</string>
+    <string name="field_port">البورت</string>
+    <string name="setting_preset">الاستجابة والجودة</string>
+    <string name="setting_preset_responsive">أسرع استجابة</string>
+    <string name="setting_preset_balanced">متوازن</string>
+    <string name="setting_preset_quality">أعلى جودة صورة</string>
+    <string name="setting_forward_audio">نقل الصوت</string>
+    <string name="setting_turn_screen_off">إطفاء شاشة الهاتف الآخر</string>
+    <string name="setting_keep_awake">إبقاء الهاتف مستيقظاً</string>
+
+    <!-- Stage 6: First-run onboarding guide -->
+    <string name="onboarding_open_guide">دليل الإعداد</string>
+    <string name="onboarding_open_guide_summary">خطوات بسيطة لتفعيل تصحيح الأخطاء اللاسلكي</string>
+    <string name="onboarding_step_counter">الخطوة %1$d من %2$d</string>
+    <string name="onboarding_step1_title">تفعيل خيارات المطور</string>
+    <string name="onboarding_step1_body">على الهاتف الذي تريد التحكم فيه، افتح الإعدادات ← حول الهاتف، ثم اضغط على «رقم الإصدار» 7 مرات متتالية حتى تظهر رسالة تفعيل خيارات المطور.</string>
+    <string name="onboarding_step2_title">تفعيل تصحيح الأخطاء اللاسلكي</string>
+    <string name="onboarding_step2_body">وصّل الهاتفين على نفس شبكة الواي فاي. ثم في الهاتف الآخر افتح الإعدادات ← النظام ← خيارات المطور ← وفعّل «تصحيح الأخطاء اللاسلكي».</string>
+    <string name="onboarding_step3_title">الإقران والاتصال</string>
+    <string name="onboarding_step3_body">اضغط «إقران جهاز جديد» هنا، ثم امسح رمز QR من شاشة تصحيح الأخطاء اللاسلكي أو اختر هاتفك من قائمة الأجهزة القريبة.</string>
+    <string name="onboarding_next">التالي</string>
+    <string name="onboarding_back">السابق</string>
+    <string name="onboarding_skip">تخطي</string>
+    <string name="onboarding_done">ابدأ الآن</string>
+
+    <!-- Stage 6: Friendly errors + Details toggle -->
+    <string name="release_connecting_title">جارٍ توصيل الشاشة</string>
+    <string name="release_connecting_help">أبقِ الهاتف الآخر مفتوحاً، ووافق على رسالة السماح بتصحيح الأخطاء إذا ظهرت.</string>
+    <string name="release_connection_failed">تعذّر الاتصال</string>
+    <string name="release_connection_check">تأكد أن الهاتفين على نفس شبكة الواي فاي وأن تصحيح الأخطاء اللاسلكي مفعّل.</string>
+    <string name="reconnect">إعادة المحاولة</string>
+    <string name="back_to_devices">العودة للأجهزة</string>
+    <string name="cancel">إلغاء</string>
+    <string name="error_pairing_required">هذا الهاتف غير مقترن بعد. ارجع واضغط «إقران جهاز جديد»، ثم امسح رمز QR أو أدخل رمز الإقران.</string>
+    <string name="error_auth_failed">رفض الهاتف الآخر الاتصال. افتح قفل الشاشة واضغط «سماح» على رسالة تصحيح الأخطاء ثم حاول مرة أخرى.</string>
+    <string name="error_unreachable">تعذّر الوصول إلى %1$s. تأكد أن الهاتفين على نفس شبكة الواي فاي، وأن شاشة الهاتف الآخر مفتوحة، وأن «تصحيح الأخطاء اللاسلكي» مفعّل.</string>
+    <string name="error_connection_lost">انقطع الاتصال مع %1$s. تأكد من بقاء الهاتفين على نفس شبكة الواي فاي وعدم إغلاق «تصحيح الأخطاء اللاسلكي».</string>
+    <string name="error_connection_refused">فعّل «تصحيح الأخطاء اللاسلكي» على الهاتف الآخر (%1$s). وإذا أعدت تشغيله فتأكد من البورت الجديد الظاهر هناك.</string>
+    <string name="error_not_responding">لم يستجب الهاتف الآخر (%1$s) في الوقت المناسب. تأكد أن الهاتفين على نفس شبكة الواي فاي، وافتح قفل الهاتف الآخر واضغط «سماح» إذا ظهرت رسالة تصحيح الأخطاء.</string>
+    <string name="error_protocol">تعذّر التواصل مع الهاتف الآخر. أغلق أي تطبيق مشاركة شاشة آخر عليه ثم حاول مرة أخرى.</string>
+    <string name="error_codec">لم يتمكن هذا الهاتف من تشغيل الفيديو. افتح إعدادات الجهاز وجرّب دقة أقل أو صيغة فيديو مختلفة.</string>
+    <string name="error_invalid_settings">بعض إعدادات العرض غير صالحة. افتح الإعدادات وتأكد من القيم ثم حاول مرة أخرى.</string>
+    <string name="error_invalid_session_choice">رفض الهاتف الآخر أحد الإعدادات المختارة لهذه الجلسة. ارجع إلى قائمة الأجهزة واتصل مجدداً.</string>
+    <string name="error_unexpected">تعذّر إكمال الاتصال. اضغط «التفاصيل» إذا كنت تريد عرض المعلومات التقنية.</string>
+    <string name="error_details_show">التفاصيل</string>
+    <string name="error_details_hide">إخفاء التفاصيل</string>
+    <string name="error_detail">التفاصيل: %1$s</string>
+</resources>

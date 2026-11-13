@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_saving">Saving\u2026</string>
+    <string name="setting_playback_sync">Playback timing</string>
+    <string name="setting_sync_low_latency">Low latency</string>
+    <string name="setting_sync_synchronized">Synchronized</string>
+    <string name="setting_sync_help">Low latency prioritizes responsiveness. When audio is available, synchronized playback delays video to align with audio, adding viewing latency. Prefer it for watching rather than fast interaction.</string>
+    <string name="setting_audio_buffer">Audio buffer</string>
+    <string name="setting_audio_buffer_automatic">Automatic</string>
+    <string name="setting_audio_buffer_automatic_summary">Automatic audio buffer</string>
+    <string name="setting_audio_buffer_preset">%1$d ms</string>
+    <string name="setting_audio_buffer_value">Audio buffer: %1$d ms</string>
+    <string name="setting_audio_buffer_help">Automatic preserves the current codec default. Select a preset, then tune from 20 to 250 ms. Larger buffers may smooth audio but add latency. This setting is kept when audio forwarding is off.</string>
+    <string name="setting_sync_offset_value">Video delay adjustment: %1$+d ms</string>
+    <string name="setting_sync_offset_help">Used only in synchronized mode. Positive values delay video further; negative values reduce video delay. Range: \u2212200 to +200 ms. Switching modes keeps this adjustment.</string>
+    <string name="setting_sync_offset_decrease">Reduce video delay by 1 ms</string>
+    <string name="setting_sync_offset_increase">Increase video delay by 1 ms</string>
+    <string name="setting_sync_offset_reset">Reset delay adjustment</string>
+    <string name="setting_auto_reconnect">Automatically reconnect</string>
+    <string name="setting_auto_reconnect_help">Off by default. Retry lost connections a limited number of times with increasing delays. Leaving the mirroring screen or canceling stops retries.</string>
+    <string name="setting_auto_reconnect_on">Automatic reconnect on</string>
+    <string name="setting_auto_reconnect_off">Automatic reconnect off</string>
+    <string name="setting_playback_apply_help">Saved playback and reconnect changes take effect when you next connect or reconnect.</string>
+    <string name="setting_playback_summary">%1$s · %2$s · %3$s</string>
+</resources>

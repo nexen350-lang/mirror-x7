@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Installing an app package (APK) from this phone on the device. -->
+    <string name="apps_install">Install app</string>
+    <string name="install_offer_title">Install this app?</string>
+    <string name="install_offer_choice_title">Install or copy?</string>
+    <string name="install_offer_reading">Reading the app on this phone…</string>
+    <string name="install_offer_version">Version %1$s</string>
+    <string name="install_offer_file">%1$s · %2$s</string>
+    <string name="install_offer_unread">This phone could not read the app\'s details. The device checks the file when it installs it.</string>
+    <string name="install_offer_choice">This file is an app. Install it on the device, or copy the file to its Download folder?</string>
+    <string name="install_offer_note">An installed version of the same app is updated. The device may ask you to confirm on its screen.</string>
+    <string name="install_action">Install</string>
+    <string name="install_copy_action">Copy to Download</string>
+    <string name="install_progress_title">Installing an app</string>
+    <string name="install_indicator_title">Installing %1$s</string>
+    <string name="install_indicator_hint">Answer on the device if it asks</string>
+    <string name="install_indicator_description">Installing %1$s on the device. If it asks you to confirm, answer on its screen.</string>
+    <string name="install_done_title">App installed</string>
+    <string name="install_done_message">%1$s is installed on the device.</string>
+    <string name="install_open_action">Open</string>
+    <string name="install_failed_title">App not installed</string>
+    <string name="install_unconfirmed_title">Install not confirmed</string>
+    <string name="install_failed_message">%1$s was not installed.</string>
+    <string name="install_device_said">The device said: %1$s</string>
+    <string name="install_unconfirmed">The device did not say whether %1$s was installed. Check its apps.</string>
+    <string name="install_interrupted">%1$s was not installed: the connection ended before the device started installing it.</string>
+    <string name="install_interrupted_unconfirmed">The connection ended while the device was installing %1$s. Check its apps to see whether it finished.</string>
+    <string name="install_send_failed">%1$s could not be sent to the device, so it was not installed.</string>
+    <string name="install_not_an_app">That file is not an app package (.apk) or app bundle (.apks, .xapk, .apkm).</string>
+    <string name="install_busy">A file is still being sent. Install the app once it finishes.</string>
+    <string name="install_needs_session">Connect to a device before installing an app.</string>
+    <string name="share_pick_device_help_app">Connecting to the device you pick, then asking whether to install this app or save the file to its Download folder.</string>
+
+    <!-- Why the device refused an app. The device's own words follow each one. -->
+    <string name="install_refused_newer">A newer version of this app is already on the device. To install this older one, uninstall it there first.</string>
+    <string name="install_refused_signature">The device already has this app, signed with a different key. Uninstalling it there first allows this one, but also deletes its data.</string>
+    <string name="install_refused_space">The device does not have enough free storage for this app.</string>
+    <string name="install_refused_android">This app needs a newer version of Android than the device has.</string>
+    <string name="install_refused_processor">This app was not built for the device\'s processor.</string>
+    <string name="install_refused_not_app">The device could not read this file as an app. It may be damaged or unsigned, or be one part of an app that comes in several files.</string>
+    <string name="install_refused_split">This app comes in several files. One of them cannot be installed on its own.</string>
+    <string name="install_refused_blocked">The device does not allow installing apps over debugging. Some phones need a setting such as Install via USB turned on in Developer options.</string>
+    <string name="install_refused_verification">The device\'s app verification, such as Google Play Protect, blocked this app.</string>
+    <string name="install_refused_cancelled">The install was cancelled on the device.</string>
+    <string name="install_refused_old_target">This app was made for an Android version so old that the device no longer installs it.</string>
+    <string name="install_refused_conflict">This app conflicts with another app on the device that uses the same permission or provider name.</string>
+    <string name="install_refused_other">The device could not install this app.</string>
+    <string name="install_refused_undescribed">The files this app needs could not be chosen, because the device did not say what it is.</string>
+    <plurals name="install_offer_bundle">
+        <item quantity="one">App bundle of %1$d file. The device gets only the files it needs, chosen by its processor, screen density, languages and Android version.</item>
+        <item quantity="other">App bundle of %1$d files. The device gets only the files it needs, chosen by its processor, screen density, languages and Android version.</item>
+    </plurals>
+    <string name="install_bundle_expansion">This bundle also carries game data, as expansion files (OBB) or asset packs, which this app does not install, so the app would be incomplete. It cannot be installed from here.</string>
+    <string name="install_bundle_unmatchable">Some of this bundle\'s files are chosen by something this app cannot check on the device (%1$s), so it could install an incomplete app. It cannot be installed from here.</string>
+    <string name="install_bundle_unreadable">This phone could not find one complete app in this bundle. It may be damaged, or be a protected .apkm file that only its own installer app can install.</string>
+    <string name="install_bundle_processor_detail">The bundle has native code for %1$s; the device runs %2$s.</string>
+    <string name="install_bundle_android_detail">The bundle needs Android API level %1$d or newer; the device has API level %2$d.</string>
+    <string name="install_bundle_no_spec_detail">The device did not say which processor, screen density and Android version it has.</string>
+    <string name="install_checked_here">Checked on this phone before anything was sent: %1$s</string>
+</resources>

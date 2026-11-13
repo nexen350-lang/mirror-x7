@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="cameras_title">Camera</string>
+    <string name="cameras_help">Point the other phone at something and watch it here. The remote screen is replaced by its camera, so touch does nothing while a camera is selected — use the torch and zoom controls instead.</string>
+    <string name="cameras_loading">Asking the device for its cameras…</string>
+    <string name="cameras_empty">The device reported no cameras it can capture from.</string>
+    <string name="cameras_session_only">The camera applies to this session only. Choosing one reconnects without changing saved settings.</string>
+    <string name="cameras_creates_profile">Choosing a camera gives this device settings of its own.</string>
+    <string name="cameras_screen">Mirror the screen</string>
+    <string name="cameras_screen_detail">The usual behaviour: see and control what is on the other phone.</string>
+    <string name="cameras_front">Front camera</string>
+    <string name="cameras_back">Back camera</string>
+    <string name="cameras_external">External camera</string>
+    <string name="cameras_numbered">Camera %1$s</string>
+    <!-- A camera the running session uses that the device's list did not include, for example "Camera 7 (in use, not listed)". -->
+    <string name="cameras_current_unlisted">%1$s (in use, not listed)</string>
+    <string name="cameras_current_unlisted_detail">The session is using this camera, but the device did not list it. Saving keeps it; choose the screen or a listed camera to change.</string>
+    <string name="cameras_id">id %1$s</string>
+    <string name="cameras_fps">%1$s fps</string>
+    <string name="cameras_zoom">up to %1$.0f×</string>
+    <string name="cameras_action">Choose a camera</string>
+    <string name="camera_torch_on">Turn the light on</string>
+    <string name="camera_torch_off">Turn the light off</string>
+    <string name="camera_zoom_in">Zoom in</string>
+    <string name="camera_zoom_out">Zoom out</string>
+    <string name="release_camera_light">Light</string>
+    <string name="release_camera_in">Zoom in</string>
+    <string name="release_camera_out">Zoom out</string>
+    <string name="cameras_list_failed">The device did not return its cameras.</string>
+    <string name="cameras_saved">Camera saved for this device.</string>
+    <string name="cameras_save_failed">Could not save the camera choice.</string>
+    <string name="cameras_capture_heading">How to capture</string>
+    <string name="cameras_size_label">Resolution</string>
+    <string name="cameras_auto">Automatic</string>
+    <string name="cameras_fps_label">Frame rate</string>
+    <string name="cameras_fps_value">%1$d fps</string>
+    <string name="cameras_high_speed">High-speed capture</string>
+    <string name="cameras_high_speed_help">A separate mode for the high frame rates some cameras only offer that way. It has its own list of sizes, and the device refuses a size from the ordinary list while it is on.</string>
+    <string name="cameras_sizes_unknown">The device did not list this camera\'s sizes, so it will choose one itself.</string>
+    <string name="cameras_size_warning">Listed sizes come from the camera\'s own declaration. A listed size can still be refused, and the device will fall back to choosing one.</string>
+</resources>

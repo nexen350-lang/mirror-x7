@@ -1,0 +1,31 @@
+name: Bug report
+description: Report a reproducible problem without private device data.
+body:
+  - type: markdown
+    attributes:
+      value: "Do not attach pairing codes, keys, private screenshots, full profile backups, or unredacted logs. Use SECURITY.md for sensitive reports."
+  - type: input
+    id: version
+    attributes:
+      label: App version and build type
+      placeholder: "3.5.7, localRelease"
+    validations:
+      required: true
+  - type: textarea
+    id: devices
+    attributes:
+      label: Client and target Android versions
+      description: "Include device models if useful, but not real addresses or device names."
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps, expected result and actual result
+    validations:
+      required: true
+  - type: textarea
+    id: settings
+    attributes:
+      label: Relevant settings and redacted diagnostics
+      description: "For playback, include codec, resolution, max FPS, sync mode, and received/decoded/surface FPS during motion."

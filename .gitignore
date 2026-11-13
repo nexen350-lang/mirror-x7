@@ -6,3 +6,46 @@ coverage/
 *.log
 .env*
 !.env.example
+
+# Android / Gradle
+*.iml
+.gradle/
+/local.properties
+/.idea/
+**/build/
+.kotlin/
+/captures
+.externalNativeBuild
+.cxx
+local.properties
+/device-apks/
+/device-reports/
+/device-smoke.sh
+/tools/upload-apk.sh
+# Local binaries, exported user data, and diagnostics are not repository source.
+*.apk
+*.aab
+*.apks
+*.hprof
+/captures/
+/backups/
+/exports/
+/releases/
+/extras/
+/archives/
+# Release signing material must never be committed.
+keystore.properties
+*.jks
+*.keystore
+*.p12
+*.pfx
+*.pem
+*.key
+adbkey
+adbkey.pub
+adbcert
+.env
+.env.*
+google-services.json
+service-account*.json
+credentials*.json

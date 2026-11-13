@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="session_starting">Starting&#8230;</string>
+    <string name="session_timeout">Connection timed out. Check the target address, debugging authorization and network.</string>
+    <string name="audio_disabled_target">The target could not enable audio.</string>
+    <string name="audio_needs_unlocked_device">No sound: on Android 11 the other device must be unlocked when the session starts. Unlock it, then tap Retry audio.</string>
+    <string name="audio_dup_refused">Android 13 will not send sound here while it also keeps playing on the device.</string>
+    <string name="audio_dup_refused_help">Hear it here moves the sound to this screen. Android 13 cannot keep playback capture playing in both places. Turn off Keep audio playing on the device, or use a device with Android 14 or newer.</string>
+    <string name="audio_hear_here">Hear it here</string>
+    <string name="clipboard_truncated">Clipboard text was shortened to the remote protocol limit.</string>
+    <string name="clipboard_unreadable">The clipboard content could not be read, so nothing was sent.</string>
+    <string name="input_invalid_unicode">Text contains an invalid Unicode character and was not sent.</string>
+    <string name="diagnostics_session">Capture %1$d: %2$d x %3$d</string>
+    <string name="diagnostics_decoder">Decoded display: %1$d x %2$d</string>
+    <string name="diagnostics_rect">Content: %1$d, %2$d / %3$d x %4$d</string>
+    <string name="diagnostics_touch">Touch: %1$.1f, %2$.1f to %3$d, %4$d</string>
+    <string name="diagnostics_written">Green: written to transport (not a remote acknowledgement). Cyan: local touch.</string>
+    <string name="diagnostics_pending">Yellow: awaiting transport write. Cyan: local touch.</string>
+    <string name="diagnostics_mismatch">Decoder and capture sizes differ. This is diagnostic evidence, not an automatic calibration correction.</string>
+    <string name="session_leave_title">Leave this session?</string>
+    <string name="session_leave_body">Local Back closes these controls first, then offers to disconnect. The Back control sends Back to the remote device.</string>
+    <string name="session_stay">Stay</string>
+</resources>

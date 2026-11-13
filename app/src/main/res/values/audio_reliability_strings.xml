@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <string name="audio_focus_resume">Audio muted because another app took audio focus. Tap the audio control to resume.</string>
+    <string name="audio_route_resume">Headphones disconnected. Audio stays muted until you resume it.</string>
+    <string name="audio_focus_denied">Audio focus is unavailable. Close the competing audio session, then tap the audio control to retry.</string>
+    <!-- Carries three independent counts, so no single quantity can select a plural form. -->
+    <string name="timing_audio_queue" tools:ignore="PluralsCandidate">Audio: queued %1$d ms, discarded %2$d frames, underruns %3$d</string>
+    <string name="timing_output_queue">Audio output queue (estimate): %1$d ms</string>
+    <string name="timing_synchronized">Measured sync active; scheduled video delay %1$d ms</string>
+    <string name="timing_sync_waiting">Sync waiting for a valid audio timestamp; video remains live</string>
+    <string name="timing_low_latency">Low-latency mode; video is not delayed for audio</string>
+    <string name="timing_av_delta">Video ahead of played audio (estimate): %1$d ms</string>
+    <string name="timing_route_speaker">Output: phone speaker</string>
+    <string name="timing_route_bluetooth">Output: Bluetooth</string>
+    <string name="timing_route_wired">Output: wired headphones</string>
+    <string name="timing_route_usb">Output: USB audio</string>
+    <string name="timing_route_other">Output: external audio device</string>
+    <string name="calibration_save_failed">Calibration could not be saved. The last saved values have been restored; check the storage warning.</string>
+</resources>

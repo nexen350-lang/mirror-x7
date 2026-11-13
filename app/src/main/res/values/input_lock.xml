@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="input_lock_action">Lock remote input</string>
+    <string name="input_unlock_action">Unlock input</string>
+    <string name="input_locked">Input locked</string>
+    <string name="input_lock_blocked">Input is locked. Unlock input to control the remote device.</string>
+    <string name="input_text_not_queued">Could not queue this text. Your draft has been kept.</string>
+    <string name="input_locked_surface_description">Remote video from %1$s. Input is locked; touches do not control the device.</string>
+</resources>

@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="camera_surface_description">Live camera from %1$s.</string>
+    <string name="camera_pip_action">Show camera in picture-in-picture</string>
+    <string name="camera_pip_label">Picture-in-picture</string>
+    <string name="camera_pip_unavailable">Picture-in-picture is not available on this device.</string>
+    <string name="camera_pip_camera_only">Picture-in-picture is only available for a live camera, not a mirrored screen.</string>
+    <string name="camera_pip_not_live">Wait for the camera video before opening picture-in-picture.</string>
+    <string name="camera_pip_busy">Finish recording, saving, sharing or sending files and close dialogs before opening picture-in-picture.</string>
+    <string name="camera_pip_not_foreground">Return to the camera before opening picture-in-picture.</string>
+    <string name="camera_pip_refused">Android could not open picture-in-picture. Check this app’s picture-in-picture access in Android settings, then try again.</string>
+    <string name="camera_pip_connecting">Connecting camera…</string>
+    <string name="camera_pip_failed">Camera unavailable</string>
+    <string name="camera_pip_disconnected">Camera disconnected</string>
+    <string name="camera_pip_pending">Return to the app to finish saving or sharing.</string>
+    <string name="camera_pip_connection_waiting">Connection waiting for full screen</string>
+    <string name="camera_pip_return_failed">Android could not return to full screen. Expand the picture-in-picture window to continue.</string>
+    <string name="camera_pip_return">Expand to return to the app.</string>
+</resources>

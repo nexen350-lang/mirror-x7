@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="recording_action_start">Record session</string>
+    <string name="recording_action_stop">Stop recording</string>
+    <string name="recording_in_progress">Recording</string>
+    <string name="recording_needs_session">Connect to a device before recording.</string>
+    <string name="recording_started">Recording the picture only. You choose where to keep the video when you stop.</string>
+    <string name="recording_empty">Nothing was recorded. The session sent no video before recording stopped.</string>
+    <string name="recording_failed">Could not record the session. Check available storage and try again.</string>
+    <string name="recording_unsupported_codec">This device cannot store %1$s video in an MP4 file. Choose H.264 or H.265 in the device settings and record again.</string>
+    <string name="recording_stopped_resized">Recording stopped because the device changed its capture size. The video up to that point was kept.</string>
+    <string name="recording_stopped_stream_changed">Recording stopped because the device restarted its video encoder. The video up to that point was kept.</string>
+    <string name="recording_storage_full">Recording stopped because the device is almost out of storage. The video up to that point was kept.</string>
+    <string name="recording_lost">Could not finish the recording, so it would not have played. Check available storage and record again.</string>
+    <string name="recording_save_title">Keep this recording?</string>
+    <string name="recording_save_message">%1$s of video was recorded. Choose where to keep it, or discard it.</string>
+    <string name="recording_save">Save</string>
+    <string name="recording_discard">Discard</string>
+    <string name="recording_saved">Recording saved.</string>
+    <string name="recording_save_failed">Could not save the recording. The chosen destination may hold an incomplete file.</string>
+</resources>

@@ -1,0 +1,218 @@
+name: build
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      run_device_tests:
+        description: Also run the API 26/36 emulator jobs (instrumentation and APK smoke tests)
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Make Gradle wrapper executable
+        run: chmod +x gradlew
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+
+      - name: Install Android 36 and APK verification tools
+        run: sdkmanager "platform-tools" "platforms;android-36" "build-tools;36.0.0"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Unit tests, lint, and installable APKs
+        run: >-
+          ./gradlew :app:testDebugUnitTest :libadb:testDebugUnitTest :app:lintDebug :app:lintLocalRelease
+          :app:assembleDebug :app:assembleLocalRelease :app:assembleDebugAndroidTest
+          :app:publicationRuntimeInventory -I tools/runtime-inventory.init.gradle
+          -PabiSplits=false --no-daemon
+
+      - name: Verify APK signatures and upgrade identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          tools="$ANDROID_HOME/build-tools/36.0.0"
+          debug="app/build/outputs/apk/debug/app-debug.apk"
+          local_release="app/build/outputs/apk/localRelease/app-localRelease.apk"
+          expected_digest="$("$tools/apksigner" verify --print-certs "$debug" | awk '/Signer #1 certificate SHA-256 digest:/ { print $NF }')"
+          test -n "$expected_digest"
+          # Read expected versionCode and versionName directly from app/build.gradle.kts.
+          expected_code="$(sed -n 's/.*versionCode[[:space:]]*=[[:space:]]*\([0-9][0-9]*\).*/\1/p' app/build.gradle.kts | head -1)"
+          expected_name="$(sed -n 's/.*versionName[[:space:]]*=[[:space:]]*"\([^"]*\)".*/\1/p' app/build.gradle.kts | head -1)"
+          test -n "$expected_code"
+          test -n "$expected_name"
+          echo "Expecting versionCode=$expected_code versionName=$expected_name"
+          for apk in "$debug" "$local_release" \
+              app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk; do
+            "$tools/apksigner" verify --verbose --print-certs "$apk"
+            digest="$("$tools/apksigner" verify --print-certs "$apk" | awk '/Signer #1 certificate SHA-256 digest:/ { print $NF }')"
+            test "$digest" = "$expected_digest"
+          done
+          for apk in "$debug" "$local_release"; do
+            "$tools/aapt2" dump badging "$apk" | grep "^package: name='com.scrcpy.remote' versionCode='$expected_code' versionName='$expected_name'"
+          done
+
+      - name: Upload test and lint reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-and-lint-reports
+          path: |
+            app/build/reports/
+            third_party/libadb/build/reports/
+          if-no-files-found: warn
+
+      - name: Upload R8 mappings
+        if: always() && vars.PUBLISH_BINARY_ARTIFACTS == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: local-release-mappings
+          path: app/build/outputs/mapping/localRelease/
+          if-no-files-found: warn
+
+      - name: Upload debug and local-release APKs
+        uses: actions/upload-artifact@v4
+        with:
+          name: installable-apks
+          path: app/build/outputs/apk/
+          if-no-files-found: error
+
+  device-regression:
+    # Runs on manual workflow_dispatch when run_device_tests is enabled.
+    if: github.event_name == 'workflow_dispatch' && inputs.run_device_tests
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        api-level: [26, 36]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+
+      - name: Download already verified APKs
+        if: vars.PUBLISH_BINARY_ARTIFACTS == 'true'
+        uses: actions/download-artifact@v4
+        with:
+          name: installable-apks
+          path: device-apks
+
+      - name: Prepare a device build when binary publishing is disabled
+        if: vars.PUBLISH_BINARY_ARTIFACTS != 'true'
+        run: |
+          chmod +x gradlew
+          sdkmanager "platform-tools" "platforms;android-36" "build-tools;36.0.0"
+
+      - name: Set up Gradle for the device build
+        if: vars.PUBLISH_BINARY_ARTIFACTS != 'true'
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Build device test APKs without uploading binaries
+        if: vars.PUBLISH_BINARY_ARTIFACTS != 'true'
+        run: |
+          ./gradlew :app:assembleDebug :app:assembleLocalRelease :app:assembleDebugAndroidTest \
+            -PabiSplits=false --no-daemon
+          mkdir -p device-apks
+          cp -R app/build/outputs/apk/. device-apks/
+
+      - name: Enable emulator acceleration
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Prepare device smoke runner
+        shell: bash
+        run: |
+          cat > device-smoke.sh <<'BASH'
+          set -euo pipefail
+          mkdir -p device-reports
+          # A system ANR/crash dialog steals window focus, which makes focus-gated APIs such as
+          # clipboard reads fail for reasons unrelated to the app under test.
+          adb shell settings put global hide_error_dialogs 1
+          adb shell wm size 480x800
+          adb shell wm density 240
+          trap 'adb logcat -d > device-reports/logcat.txt; adb shell wm size reset; adb shell wm density reset' EXIT
+          for variant in debug localRelease; do
+            adb install -r "device-apks/$variant/app-$variant.apk"
+            adb shell am start -W -n com.scrcpy.remote/com.scrcpy.remote.ui.MainActivity > "device-reports/launch-$variant.txt"
+            cat "device-reports/launch-$variant.txt"
+            grep -q 'Status: ok' "device-reports/launch-$variant.txt"
+            if [ "$variant" = debug ]; then
+              # The suite also creates an actual 640x320 dp, 2x-text dialog window.
+              # Keep the small-window black-box launch checks, but give that fixture room.
+              adb shell wm size 1080x2400
+              adb shell wm density 420
+              adb install -r device-apks/androidTest/debug/app-debug-androidTest.apk
+              adb shell am instrument -w -r com.scrcpy.remote.test/androidx.test.runner.AndroidJUnitRunner | tee device-reports/instrumentation-debug.txt
+              grep -Eq '^OK \([1-9][0-9]* tests?\)' device-reports/instrumentation-debug.txt
+              if grep -Eq 'FAILURES!!!|INSTRUMENTATION_FAILED|Process crashed' device-reports/instrumentation-debug.txt; then exit 1; fi
+              adb shell wm size 480x800
+              adb shell wm density 240
+            else
+              # Black-box smoke: do not weaken application R8 rules for test-harness reflection.
+              adb shell uiautomator dump /sdcard/scrcpy-smoke.xml
+              adb pull /sdcard/scrcpy-smoke.xml device-reports/local-release-ui.xml
+              grep -Eq 'Your devices|Scrcpy Android' device-reports/local-release-ui.xml
+              test -n "$(adb shell pidof com.scrcpy.remote)"
+            fi
+            adb shell am force-stop com.scrcpy.remote
+          done
+          adb install -r device-apks/debug/app-debug.apk
+          adb shell am start -W -n com.scrcpy.remote/com.scrcpy.remote.ui.MainActivity > device-reports/launch-debug-after-local-release.txt
+          grep -q 'Status: ok' device-reports/launch-debug-after-local-release.txt
+          BASH
+
+      - name: Instrumented debug to minified upgrade smoke tests
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: ${{ matrix.api-level }}
+          arch: x86_64
+          target: google_apis
+          profile: pixel_2
+          ram-size: 2048M
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
+          script: bash device-smoke.sh
+
+      - name: Upload device reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: device-reports-api-${{ matrix.api-level }}
+          path: device-reports/
+          if-no-files-found: warn

@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="pair_still_finishing">The previous pairing request is still finishing. Try again shortly.</string>
+    <string name="pair_code_six_digits">Pairing code must contain six digits (0\u20139).</string>
+
+    <string name="diag_open">Diagnose</string>
+    <string name="diag_title">Connection diagnosis</string>
+    <string name="diag_cause_label">What happened</string>
+    <string name="diag_next_label">What to try</string>
+
+    <string name="diag_auth_cause">The device did not accept this phone\u2019s ADB key, or it is not paired.</string>
+    <string name="diag_auth_next">Re-pair the device, and tick \u201cAlways allow\u201d when it asks \u201cAllow debugging?\u201d.</string>
+    <string name="diag_network_cause">The device could not be reached over the network.</string>
+    <string name="diag_network_next">Check that both devices are on the same Wi\u2011Fi, that the device is awake, and that its address has not changed.</string>
+    <string name="diag_lost_cause">The device answered, then the connection dropped.</string>
+    <string name="diag_lost_next">Check the Wi\u2011Fi signal on both devices, then retry.</string>
+    <string name="diag_refused_cause">The device is reachable, but nothing is listening on this port.</string>
+    <string name="diag_refused_next">Turn Wireless debugging off and on again; its port changes each time. Update the saved port, or re-pair.</string>
+    <string name="diag_server_cause">The device refused the session or one of its settings.</string>
+    <string name="diag_server_next">Retry. If it repeats, use Connect from the device list, or reset this device\u2019s mirroring settings.</string>
+    <string name="diag_timeout_cause">The device stopped answering in time.</string>
+    <string name="diag_timeout_next">Wake the device, check the Wi\u2011Fi signal, and retry. A busy or sleeping device can be slow to answer.</string>
+    <string name="diag_codec_cause">The video, audio or input stream could not be started on this phone or on the device.</string>
+    <string name="diag_codec_next">Retry with a lower resolution or a different video codec in this device\u2019s settings.</string>
+    <string name="diag_other_cause">The connection failed for a reason the app could not classify.</string>
+    <string name="diag_other_next">Retry. If it repeats, copy the diagnostic details and check the technical message below.</string>
+
+    <string name="diag_action_repair">Re-pair device</string>
+    <string name="diag_action_help">Wireless debugging help</string>
+    <string name="diag_action_settings">Open Wi\u2011Fi settings</string>
+    <string name="diag_action_copy">Copy diagnostic details</string>
+    <string name="diag_action_details">Details</string>
+    <string name="diag_copied">Diagnostic details copied</string>
+    <string name="diag_help_text">On the device: Settings \u2192 Developer options \u2192 Wireless debugging. Turn it on, then use \u201cPair device with pairing code\u201d to re-pair. The connect port shown on the Wireless debugging screen changes each time it is turned on.</string>
+
+    <string name="check_connection">Check connection</string>
+    <string name="check_connection_title">Connection check: %1$s</string>
+    <string name="check_connection_run_again">Check again</string>
+    <string name="check_step_network">Network: device reachable at this address</string>
+    <string name="check_step_adb">ADB handshake and authorization</string>
+    <string name="check_step_server">Server can be deployed</string>
+    <string name="check_status_pending">Waiting</string>
+    <string name="check_status_running">Checking\u2026</string>
+    <string name="check_status_passed">OK</string>
+    <string name="check_status_failed">Failed</string>
+    <string name="check_status_skipped">Skipped</string>
+    <string name="check_result_ok">All checks passed. The device is ready to connect.</string>
+    <string name="check_result_failed">First failing step: %1$s</string>
+</resources>

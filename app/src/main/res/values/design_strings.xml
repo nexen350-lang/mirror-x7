@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- The settings sheet's last group, about the app rather than about mirroring. -->
+    <string name="settings_about">About</string>
+    <string name="field_ip_help">Shown on the other phone under Wireless debugging.</string>
+</resources>

@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="quality_title">Recent quality</string>
+    <string name="quality_window">%1$d samples retained · last 60 s · at most 120 samples</string>
+    <string name="quality_collection_help">Collected only while Connection details is open and the controller is visible. Closing pauses collection; reopening keeps unexpired samples. Gaps are not measured.</string>
+    <string name="quality_waiting">Waiting for sampled measurements.</string>
+    <string name="quality_missing">Not measured</string>
+    <string name="quality_audio_unavailable">Unavailable</string>
+    <string name="quality_audio_off">Audio off · not sampled</string>
+    <string name="quality_rendered_fps">Rendered FPS</string>
+    <string name="quality_client_p95">Client p95 latency</string>
+    <string name="quality_audio_queue">Audio queue</string>
+    <string name="quality_underrun_delta">Underrun increases</string>
+    <string name="quality_increase">+%1$d</string>
+    <string name="quality_metric_summary">First measured: %1$s\nLatest sampled: %2$s\nObserved range: %3$s–%4$s · %5$d measurements</string>
+    <string name="quality_observed_total">%1$d across %2$d sampled intervals</string>
+    <string name="quality_delta_totals">Skipped increases: %1$s\nUnderrun increases: %2$s\nThese are observed increases, not session totals. Only adjacent samples no more than 1 s apart count.</string>
+    <string name="quality_method_help">Trends run from older to newer; each uses its own scale. Dots are measured samples, never estimates across gaps. Rendered FPS uses a one-second window; each client p95 sample uses the recent frame window. Client latency is receipt to render, not network or glass-to-glass latency. Audio queue is the client PCM queue. History stays in memory only: no persistence or upload, no addresses or clipboard contents stored.</string>
+    <string name="quality_requested_bitrate_help">Requested encoder rate, not measured bandwidth.</string>
+</resources>

@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="session_device_settings">Device settings</string>
+    <string name="session_settings_pending">Saved mirroring settings differ from this connection. Reconnect when you are ready to apply them.</string>
+    <string name="session_apply_settings">Apply and reconnect</string>
+    <string name="session_apply_settings_title">Apply saved settings?</string>
+    <string name="session_apply_settings_help">This reconnects the remote session using its latest saved settings. Ongoing touch gestures will end.</string>
+</resources>

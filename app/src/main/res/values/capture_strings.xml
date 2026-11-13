@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="capture_screenshot">Save screenshot</string>
+    <string name="capture_busy">Preparing screenshot</string>
+    <string name="capture_saved">Screenshot saved.</string>
+    <string name="capture_cancelled">Screenshot save cancelled.</string>
+    <string name="capture_picker_unavailable">No document picker is available to save the screenshot.</string>
+    <string name="capture_share_screenshot">Share a screenshot of the remote screen</string>
+</resources>

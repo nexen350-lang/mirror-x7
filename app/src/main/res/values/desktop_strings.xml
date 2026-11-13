@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="desktop_title">Adaptive desktop</string>
+    <string name="desktop_start">Start desktop</string>
+    <string name="desktop_restart">Restart desktop</string>
+    <string name="desktop_active">In use. The desktop follows this window.</string>
+    <string name="desktop_help">Start a separate desktop that fits this window and follows window size changes. Reconnects for this session only; saved settings are unchanged. Uses the window\'s orientation instead of a saved orientation lock. Support depends on the remote device.</string>
+    <string name="desktop_session_display">A display choice reconnects this session only, replacing any camera or virtual desktop. Saved settings are unchanged.</string>
+    <string name="desktop_return_primary">Return to the main screen first. This desktop\'s temporary display disappears on reconnect; other displays can be selected afterwards.</string>
+    <string name="desktop_recording_paused">Auto-fit is paused while recording. The latest window size will be applied after recording stops.</string>
+    <string name="desktop_recording_wait">The desktop is still resizing. Start recording after the new picture arrives.</string>
+    <string name="desktop_stop_recording">Stop recording before switching displays or starting an adaptive desktop.</string>
+    <string name="desktop_resize_failed">The desktop resize was not confirmed. New recordings are blocked for safety. Use Restart desktop in Display to reconnect and retry.</string>
+    <string name="desktop_window_unavailable">The window has not been measured yet. Try starting the desktop again.</string>
+    <string name="desktop_needs_connection">Connect to the device before choosing a display.</string>
+    <string name="desktop_invalid_display">That display ID is outside the supported range.</string>
+    <string name="recording_export_in_progress">Saving the recording. Wait for the copy to finish.</string>
+</resources>

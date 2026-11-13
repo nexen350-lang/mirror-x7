@@ -1,0 +1,30 @@
+<resources>
+    <string name="storage_saving">Saving changes…</string>
+    <string name="storage_saving_help">Please wait for the storage result. Changes are saved in the background.</string>
+    <string name="storage_save_failed">Changes could not be saved. Your previous configuration is unchanged. Review the storage error and try again.</string>
+    <string name="history_title">Backup history</string>
+    <string name="history_help">The latest five complete pre-import snapshots are kept. Partial legacy records and damaged recovery data are kept separately until you explicitly delete them. Restoring always opens a preview first.</string>
+    <string name="history_empty">No backup history yet. A snapshot is saved before an import changes your configuration.</string>
+    <string name="history_date_unknown">Date unavailable (legacy or damaged record)</string>
+    <plurals name="history_count">
+        <item quantity="one">%1$d saved profile</item>
+        <item quantity="other">%1$d saved profiles</item>
+    </plurals>
+    <string name="history_count_unknown">Profile count unavailable</string>
+    <string name="history_complete">Complete snapshot</string>
+    <string name="history_protected">Partial / recovery data · not automatically removed</string>
+    <string name="history_details">Details</string>
+    <string name="history_restore">Preview restore</string>
+    <string name="history_export">Export snapshot</string>
+    <string name="history_delete">Delete record</string>
+    <string name="history_delete_title">Delete this backup?</string>
+    <string name="history_delete_message">Delete “%1$s” (%2$s)? This removes only this history record, not your current settings or devices. It cannot be undone.</string>
+    <string name="history_delete_recovery_warning">This record contains original partial or damaged data. Deleting it also permanently removes that recovery source.</string>
+    <string name="history_deleted">Backup record deleted.</string>
+    <string name="history_failed">Backup history could not be updated. No requested change was committed. Review the storage error and retry.</string>
+    <string name="history_read_failed">Could not read this backup: %1$s</string>
+    <string name="history_busy">Working with backup history…</string>
+    <string name="history_retry">Refresh</string>
+    <string name="history_back">Back to history</string>
+    <string name="history_entry_summary">%1$s\n%2$s</string>
+</resources>

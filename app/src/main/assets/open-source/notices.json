@@ -1,0 +1,172 @@
+{
+  "components": [
+    {
+      "name": "scrcpy server",
+      "version": "5.0.1",
+      "license": "Apache License 2.0",
+      "copyright": "Copyright (C) 2018 Genymobile. Copyright (C) 2018-2026 Romain Vimont.",
+      "url": "https://github.com/Genymobile/scrcpy",
+      "note": "Official upstream server, unmodified. The app copies it to the connected device and starts it there.",
+      "files": [
+        "licenses/scrcpy-LICENSE.txt"
+      ],
+      "artifacts": []
+    },
+    {
+      "name": "libadb-android",
+      "version": "3.1.1, with changes",
+      "license": "Apache License 2.0, chosen from GPL-3.0-or-later or Apache-2.0; some files also under BSD-3-Clause or MIT",
+      "url": "https://github.com/MuntashirAkon/libadb-android",
+      "note": "Its changes for this app are listed in PATCHES.txt below.",
+      "files": [
+        "libadb/COPYING",
+        "libadb/LICENSES/Apache-2.0",
+        "libadb/LICENSES/BSD-3-Clause",
+        "libadb/LICENSES/MIT",
+        "libadb/PATCHES.txt"
+      ],
+      "artifacts": [
+        "ScrcpyRemote:libadb"
+      ]
+    },
+    {
+      "name": "SPAKE2 from BoringSSL",
+      "version": "spake25519",
+      "license": "Apache License 2.0",
+      "copyright": "Copyright 2016 The BoringSSL Authors.",
+      "url": "https://boringssl.googlesource.com/boringssl",
+      "note": "Ported to Java for this app to pair with wireless debugging.",
+      "files": [
+        "licenses/boringssl-LICENSE.txt"
+      ],
+      "artifacts": []
+    },
+    {
+      "name": "Conscrypt",
+      "version": "2.7.0",
+      "license": "Apache License 2.0, with BoringSSL and Chromium terms for parts",
+      "copyright": "Copyright 2016 The Android Open Source Project.",
+      "url": "https://github.com/google/conscrypt",
+      "files": [
+        "licenses/conscrypt-NOTICE.txt",
+        "licenses/conscrypt-LICENSE.txt",
+        "licenses/boringssl-LICENSE.txt"
+      ],
+      "artifacts": [
+        "org.conscrypt:conscrypt-android"
+      ]
+    },
+    {
+      "name": "Bouncy Castle",
+      "version": "1.86",
+      "license": "MIT License",
+      "copyright": "Copyright (c) 2000-2026 The Legion of the Bouncy Castle Inc.",
+      "url": "https://www.bouncycastle.org",
+      "files": [
+        "licenses/bouncycastle-LICENSE.txt"
+      ],
+      "artifacts": [
+        "org.bouncycastle:*"
+      ]
+    },
+    {
+      "name": "Android Jetpack and Jetpack Compose",
+      "version": "Compose 1.11.4, Material 3 1.4.0, Core 1.17.0, Lifecycle 2.9.4 and their libraries",
+      "license": "Apache License 2.0",
+      "url": "https://developer.android.com/jetpack/androidx",
+      "files": [
+        "licenses/Apache-2.0.txt"
+      ],
+      "artifacts": [
+        "androidx.*:*"
+      ]
+    },
+    {
+      "name": "Kotlin standard library",
+      "version": "2.4.20",
+      "license": "Apache License 2.0",
+      "copyright": "Copyright 2010-2024 JetBrains s.r.o. and respective authors and developers.",
+      "url": "https://kotlinlang.org",
+      "files": [
+        "licenses/kotlin-NOTICE.txt",
+        "licenses/Apache-2.0.txt"
+      ],
+      "artifacts": [
+        "org.jetbrains.kotlin:kotlin-stdlib"
+      ]
+    },
+    {
+      "name": "kotlinx.coroutines",
+      "version": "1.11.0",
+      "license": "Apache License 2.0",
+      "copyright": "Copyright 2000-2020 JetBrains s.r.o. and Kotlin Programming Language contributors.",
+      "url": "https://github.com/Kotlin/kotlinx.coroutines",
+      "files": [
+        "licenses/Apache-2.0.txt"
+      ],
+      "artifacts": [
+        "org.jetbrains.kotlinx:kotlinx-coroutines-*"
+      ]
+    },
+    {
+      "name": "kotlinx.serialization",
+      "version": "1.11.0",
+      "license": "Apache License 2.0",
+      "url": "https://github.com/Kotlin/kotlinx.serialization",
+      "files": [
+        "licenses/Apache-2.0.txt"
+      ],
+      "artifacts": [
+        "org.jetbrains.kotlinx:kotlinx-serialization-*"
+      ]
+    },
+    {
+      "name": "JetBrains Java Annotations",
+      "version": "23.0.0",
+      "license": "Apache License 2.0",
+      "url": "https://github.com/JetBrains/java-annotations",
+      "files": [
+        "licenses/Apache-2.0.txt"
+      ],
+      "artifacts": [
+        "org.jetbrains:annotations"
+      ]
+    },
+    {
+      "name": "Guava ListenableFuture",
+      "version": "1.0",
+      "license": "Apache License 2.0",
+      "url": "https://github.com/google/guava",
+      "files": [
+        "licenses/Apache-2.0.txt"
+      ],
+      "artifacts": [
+        "com.google.guava:listenablefuture"
+      ]
+    },
+    {
+      "name": "JSpecify",
+      "version": "1.0.0",
+      "license": "Apache License 2.0",
+      "url": "https://jspecify.dev",
+      "files": [
+        "licenses/Apache-2.0.txt"
+      ],
+      "artifacts": [
+        "org.jspecify:jspecify"
+      ]
+    },
+    {
+      "name": "ZXing Core",
+      "version": "3.5.3",
+      "license": "Apache License 2.0",
+      "url": "https://github.com/zxing/zxing",
+      "files": [
+        "licenses/Apache-2.0.txt"
+      ],
+      "artifacts": [
+        "com.google.zxing:core"
+      ]
+    }
+  ]
+}

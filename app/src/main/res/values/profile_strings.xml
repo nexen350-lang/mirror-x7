@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="profile_portrait">remote portrait</string>
+    <string name="profile_landscape">remote landscape</string>
+    <string name="profile_saved_scope">%1$s • %2$s</string>
+    <string name="profile_temporary_scope">This session • %1$s</string>
+    <string name="profile_custom">Custom calibration for this profile</string>
+    <string name="profile_inherited">Using global calibration defaults</string>
+    <string name="profile_use_defaults">Use global defaults</string>
+</resources>

@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="details_title">Connection details</string>
+    <string name="details_action">Connection details</string>
+    <string name="details_connection">Connection</string>
+    <string name="details_address">Address</string>
+    <string name="details_device">Saved as</string>
+    <string name="details_recording">Recording</string>
+    <string name="details_video">Video</string>
+    <string name="details_audio">Audio</string>
+    <string name="details_timing">Playback timing</string>
+    <string name="details_codec">Codec</string>
+    <string name="details_encoder">Encoder</string>
+    <string name="details_device_default">Chosen by device</string>
+    <string name="details_resolution">Resolution</string>
+    <string name="details_resolution_value">%1$d × %2$d</string>
+    <string name="details_max_size">Requested at most %1$d px</string>
+    <string name="details_bitrate">Requested bit rate</string>
+    <string name="details_mbps">%1$d Mbps</string>
+    <string name="details_frame_rate">Frame rate</string>
+    <string name="details_fps">%1$d fps</string>
+    <string name="details_frame_rate_detail">%1$s received, %2$s decoded, capped at %3$d. Rates use the last second, not session totals.</string>
+    <string name="details_latency">Client latency</string>
+    <string name="details_millis">%1$d ms</string>
+    <string name="details_latency_detail">%1$d ms at the 95th percentile, %2$d ms worst, of which %3$d ms waiting to reach the decoder. Measured from this phone receiving a frame to it reaching the screen; it does not include the remote device or the network.</string>
+    <string name="details_skipped">Skipped · session total</string>
+    <string name="details_skipped_detail">Cumulative decoded frames not shown, usually while catching up. Recent history reports interval increases separately.</string>
+    <string name="details_source">Source</string>
+    <string name="details_buffered">Buffered</string>
+    <string name="details_ms">%1$d ms</string>
+    <plurals name="details_underruns">
+        <item quantity="one">%1$d underrun · cumulative counter</item>
+        <item quantity="other">%1$d underruns · cumulative counter</item>
+    </plurals>
+    <string name="details_mode">Mode</string>
+    <string name="details_video_delay">Video held back</string>
+    <string name="details_av_offset">Video ahead of audio</string>
+    <string name="details_timing_help">Low latency shows each frame as it arrives. Synchronized holds video back to match the sound.</string>
+    <string name="details_copy">Copy</string>
+    <string name="details_copied">Connection details copied.</string>
+    <string name="details_on">On</string>
+    <string name="details_off">Off</string>
+    <string name="details_pending">Not yet known</string>
+    <string name="details_not_connected">Nothing is connected yet, so there is nothing to report.</string>
+</resources>

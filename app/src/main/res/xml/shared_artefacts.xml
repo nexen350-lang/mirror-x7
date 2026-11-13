@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    What this app is willing to hand to another app.
+
+    Deliberately two named sub-directories of the cache rather than the cache root. The cache also
+    holds files shared *into* this app on their way to the remote device, and a root grant would
+    let any app that received one screenshot URI go looking for those as well.
+
+    The paths match the directories used by ScreenshotCache.DIRECTORY and
+    MirrorViewModel.RECORDING_DIRECTORY; ArtefactSharingTest pins them together so a rename cannot
+    silently widen or break this.
+-->
+<paths>
+    <cache-path name="screenshots" path="screenshots/" />
+    <cache-path name="recordings" path="recordings/" />
+</paths>

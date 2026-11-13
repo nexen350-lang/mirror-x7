@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Recording with sound. Android's MP4 writer only takes AAC sound beside the picture. -->
+    <string name="recording_started_with_sound">Recording with sound. You choose where to keep the video when you stop.</string>
+    <string name="recording_started_sound_off">Recording the picture only: sound is off for this session.</string>
+    <string name="recording_started_no_sound">Recording the picture only: this session has no sound right now.</string>
+    <string name="recording_stopped_sound">Recording stopped because the sound stopped. The video up to that point, with its sound, was kept.</string>
+    <string name="recording_sound_stopped_empty">Recording stopped because the sound stopped before anything was recorded.</string>
+    <string name="recording_sound_timeline">Recording stopped: its sound could not be lined up with the picture. Record again, or turn sound off for this session to record the picture only.</string>
+    <string name="recording_sound_unsupported">Recording stopped: this phone could not add the session\'s sound to the video.</string>
+    <string name="recording_sound_not_started">The session reconnected, but its AAC sound did not start, so recording did not begin. Record again for the picture only.</string>
+    <string name="recording_sound_title">Record with sound?</string>
+    <string name="recording_sound_body">This session\'s sound is %1$s, and Android can only put AAC sound in an MP4 video. Reconnecting with AAC takes a moment and changes only this session, not its saved settings.</string>
+    <string name="recording_sound_reconnect">Reconnect and record</string>
+    <string name="recording_sound_picture_only">Picture only</string>
+    <!-- The indicator shown while recording, read with its elapsed time, for example "Recording with sound, 0:42". -->
+    <string name="recording_indicator_with_sound">Recording with sound, %1$s</string>
+    <string name="recording_indicator_picture_only">Recording the picture only, %1$s</string>
+    <!-- The finished recording's length and what it holds, for example "0:42 with sound". -->
+    <string name="recording_summary_with_sound">%1$s with sound</string>
+    <string name="recording_summary_picture_only">%1$s, picture only</string>
+    <string name="audio_codec_recording_hint">Recordings include sound with AAC. Other sound asks to reconnect with AAC when you record.</string>
+</resources>

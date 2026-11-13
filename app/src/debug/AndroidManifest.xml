@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <application>
+        <!--
+            Debug only: gives the instrumented tests a real content:// URI to share in, now that
+            ShareCache refuses file:// URIs. Not exported, and not part of a release build. URI
+            grants are allowed so a test can place one of its URIs on the clipboard.
+        -->
+        <provider
+            android:name="com.scrcpy.remote.session.TestShareProvider"
+            android:authorities="com.scrcpy.remote.debug.shares"
+            android:exported="false"
+            android:grantUriPermissions="true" />
+
+        <!--
+            Debug only: a target for the precision pad's live test to press and scroll on the
+            device being mirrored. Not exported, and not part of a release build.
+        -->
+        <activity
+            android:name="com.scrcpy.remote.ui.PadTargetActivity"
+            android:exported="false" />
+    </application>
+
+</manifest>

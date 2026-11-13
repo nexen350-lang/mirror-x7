@@ -1,0 +1,22 @@
+name: Feature request
+description: Suggest a change to authorized remote-control workflows.
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem to solve
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behavior and alternatives
+    validations:
+      required: true
+  - type: checkboxes
+    id: authorization
+    attributes:
+      label: Intended use
+      options:
+        - label: "This request does not bypass device authorization or target-app protections."
+          required: true

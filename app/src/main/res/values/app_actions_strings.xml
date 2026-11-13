@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Actions on one of the device's apps, from its row in the Apps dialog. -->
+    <string name="apps_open">Open</string>
+    <string name="apps_refresh">Refresh the app list</string>
+    <string name="apps_more_actions">More actions for %1$s</string>
+    <string name="apps_restart">Force stop and reopen</string>
+    <string name="apps_app_info">App info</string>
+    <string name="apps_uninstall">Uninstall…</string>
+    <string name="app_pages_need_session">Connect to a device before opening App info or Uninstall.</string>
+    <string name="app_pages_unavailable">App info and Uninstall open on the device\'s own screen, which this session is not showing.</string>
+    <string name="app_info_failed">The device did not open App info for %1$s.</string>
+    <string name="app_uninstall_failed">The device did not open its uninstall prompt for %1$s.</string>
+</resources>

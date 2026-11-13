@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="compact_more_controls">More controls</string>
+    <string name="compact_navigation_only">Compact controls</string>
+    <string name="compact_audio_notice">Audio needs attention. Open more controls.</string>
+    <string name="compact_settings_notice">Saved settings are waiting to apply. Open more controls.</string>
+</resources>

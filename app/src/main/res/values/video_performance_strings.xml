@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="video_frame_rates">FPS: received %1$d / decoded %2$d / surface %3$d</string>
+    <string name="video_frames_skipped">Video frames skipped locally: %1$d</string>
+</resources>

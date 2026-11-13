@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Sections of the full session panel, More controls. -->
+    <string name="panel_section_input">Input</string>
+    <string name="panel_section_capture">Capture</string>
+    <string name="panel_section_session">Session</string>
+    <!-- Short tile labels; the full action is the tile's description. -->
+    <string name="input_lock_label">Lock</string>
+    <string name="input_unlock_label">Unlock</string>
+    <!-- Spoken state of a tile that switches something on or off. -->
+    <string name="toggle_state_on">On</string>
+    <string name="toggle_state_off">Off</string>
+    <!-- A camera session's stream statistics overlay; a camera has no touch offsets to calibrate. -->
+    <string name="panel_overlay_label">Overlay</string>
+    <string name="panel_overlay_description">Diagnostics overlay</string>
+    <string name="handle_description">Controls</string>
+    <string name="handle_state_expanded">Expanded</string>
+    <string name="handle_state_collapsed">Collapsed</string>
+    <string name="handle_action_open">Open controls</string>
+    <string name="handle_action_close">Close controls</string>
+    <string name="kbps_mega_format" translatable="false">%1$.1f Mb/s</string>
+    <string name="kbps_kilo_format" translatable="false">%1$d kb/s</string>
+</resources>

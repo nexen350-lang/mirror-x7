@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="device_list_search">Search devices</string>
+    <string name="device_list_search_hint">Name, host, or address</string>
+    <string name="device_list_clear_search">Clear device search</string>
+    <string name="device_list_no_matches">No matching devices. Try a different name, host, or address.</string>
+    <string name="device_list_show_pairing_help">Show wireless debugging setup</string>
+    <string name="device_list_hide_pairing_help">Hide wireless debugging setup</string>
+    <string name="device_list_connect">Connect to %1$s</string>
+    <string name="device_list_add_favorite">Add %1$s to favorites</string>
+    <string name="device_list_remove_favorite">Remove %1$s from favorites</string>
+    <string name="device_list_more_actions">More actions for %1$s</string>
+    <string name="device_list_settings_action">Change settings for %1$s</string>
+    <string name="device_list_remove">Remove</string>
+</resources>

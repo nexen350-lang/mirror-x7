@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="stream_choices_title">Picture &amp; sound</string>
+    <string name="stream_choices_label">Codecs</string>
+    <string name="stream_choices_running">Running now: %1$s</string>
+    <string name="stream_choice_summary">%1$s · %2$s · scrcpy %3$s</string>
+    <string name="stream_choice_summary_silent">%1$s · no sound · scrcpy %2$s</string>
+    <string name="stream_choices_video">Video codec</string>
+    <string name="stream_choices_audio">Sound codec</string>
+    <string name="stream_choices_audio_off">Sound is off for this session, so it has no codec to choose.</string>
+    <string name="stream_choices_session_only">For this session only. The device\'s saved settings stay as they are; change them in its settings to keep a choice.</string>
+    <string name="stream_choices_recording">Applying ends the recording, and offers it for saving first.</string>
+    <string name="stream_choices_apply">Apply and reconnect</string>
+    <string name="stream_choices_checking">Checking which encoders the device has…</string>
+    <string name="stream_choices_unchecked">The device\'s encoders could not be checked, so a codec it lacks will fail when applied.</string>
+    <string name="stream_choices_check_again">Check again</string>
+    <string name="codec_support_on_device">On the device</string>
+    <string name="codec_support_not_on_device">Not on the device</string>
+    <string name="codec_support_not_checked">Not checked</string>
+    <string name="codec_support_running">In use</string>
+    <string name="stream_choices_revert">Go back to %1$s</string>
+</resources>

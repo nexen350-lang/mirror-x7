@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<lint>
+    <!--
+        local.properties is generated per machine by Android Studio, is git-ignored and is never
+        packaged, so its escaping cannot affect the built app. Aborting the build on it would break
+        every Windows checkout whose IDE wrote an unescaped drive letter. The check stays enabled
+        for every properties file that is actually part of the project.
+    -->
+    <issue id="PropertyEscape">
+        <ignore regexp="local\.properties" />
+    </issue>
+</lint>
