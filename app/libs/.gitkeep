@@ -1,0 +1,1 @@
+# Local AAR/JAR libraries placed in app/libs are included automatically by app/build.gradle.kts.
