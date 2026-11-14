@@ -293,4 +293,38 @@ class VideoLayoutTest {
         assertTrue(nanPan.isValid)
         assertTrue(nanPan.contentLeft.isFinite() && nanPan.contentTop.isFinite())
     }
+
+    @Test
+    fun focalZoomAnchorsFocusPixelAndClampsWithinBounds() {
+        val (panX, panY) = VideoLayout.computeFocalZoomPan(
+            viewWidth = 1000,
+            viewHeight = 1000,
+            videoWidth = 1000,
+            videoHeight = 1000,
+            oldZoom = 1f,
+            newZoom = 2f,
+            oldPanX = 0f,
+            oldPanY = 0f,
+            oldFocusX = 250f,
+            oldFocusY = 250f,
+        )
+        val zoomed = VideoLayout.fitCentered(1000, 1000, 1000, 1000, 2f, panX, panY)
+        assertEquals(250, zoomed.toDeviceX(250f))
+        assertEquals(250, zoomed.toDeviceY(250f))
+
+        val (resetX, resetY) = VideoLayout.computeFocalZoomPan(
+            viewWidth = 1000,
+            viewHeight = 1000,
+            videoWidth = 1000,
+            videoHeight = 1000,
+            oldZoom = 2f,
+            newZoom = 1f,
+            oldPanX = panX,
+            oldPanY = panY,
+            oldFocusX = 250f,
+            oldFocusY = 250f,
+        )
+        assertEquals(0f, resetX, 0.01f)
+        assertEquals(0f, resetY, 0.01f)
+    }
 }

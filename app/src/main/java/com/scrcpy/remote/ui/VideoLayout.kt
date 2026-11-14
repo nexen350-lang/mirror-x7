@@ -149,13 +149,56 @@ data class VideoLayout(
         }
 
         /**
+         * Computes the new clamped `(panX, panY)` when magnifying from [oldZoom] to [newZoom]
+         * while keeping the video pixel under ([oldFocusX], [oldFocusY]) anchored at
+         * ([newFocusX], [newFocusY]) in view coordinates.
+         */
+        internal fun computeFocalZoomPan(
+            viewWidth: Int,
+            viewHeight: Int,
+            videoWidth: Int,
+            videoHeight: Int,
+            oldZoom: Float,
+            newZoom: Float,
+            oldPanX: Float,
+            oldPanY: Float,
+            oldFocusX: Float,
+            oldFocusY: Float,
+            newFocusX: Float = oldFocusX,
+            newFocusY: Float = oldFocusY,
+        ): Pair<Float, Float> {
+            val safeOldZoom = sanitizeZoom(oldZoom)
+            val safeNewZoom = sanitizeZoom(newZoom)
+            if (viewWidth <= 0 || viewHeight <= 0 || videoWidth <= 0 || videoHeight <= 0 || safeNewZoom <= 1f) {
+                return 0f to 0f
+            }
+            val vw = viewWidth.toFloat()
+            val vh = viewHeight.toFloat()
+            val fitted = fitCentered(viewWidth, viewHeight, videoWidth, videoHeight, safeNewZoom)
+            val ratio = safeNewZoom / safeOldZoom
+            val safeOldPanX = if (oldPanX.isFinite()) oldPanX else 0f
+            val safeOldPanY = if (oldPanY.isFinite()) oldPanY else 0f
+            val rawPanX = if (oldFocusX.isFinite() && newFocusX.isFinite()) {
+                (newFocusX - vw / 2f) - ratio * (oldFocusX - vw / 2f - safeOldPanX)
+            } else {
+                safeOldPanX * ratio
+            }
+            val rawPanY = if (oldFocusY.isFinite() && newFocusY.isFinite()) {
+                (newFocusY - vh / 2f) - ratio * (oldFocusY - vh / 2f - safeOldPanY)
+            } else {
+                safeOldPanY * ratio
+            }
+            return clampPan(vw, fitted.contentWidth, rawPanX) to clampPan(vh, fitted.contentHeight, rawPanY)
+        }
+
+        /**
          * Keeps zoom inside a range that can produce a usable layout.
          *
          * A NaN or zero reaching the surface layout would size it to nothing and lose the stream
          * with no visible cause, so it is corrected here — at the one place that turns a zoom into
          * a rectangle — rather than trusted to every caller.
          */
-        private fun sanitizeZoom(zoom: Float): Float =
+        internal fun sanitizeZoom(zoom: Float): Float =
             if (!zoom.isFinite() || zoom < 1f) 1f else min(zoom, MAX_ZOOM)
     }
 }

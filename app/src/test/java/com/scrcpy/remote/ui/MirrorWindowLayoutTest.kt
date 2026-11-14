@@ -282,6 +282,112 @@ class MirrorWindowLayoutTest {
         )
     }
 
+    @Test
+    fun tabletDefaultWindowUsesLargerFootprintWhileKeepingSideBarRoom() {
+        val tabletPortrait = ControlBounds(24, 24, 1576, 2536)
+        val tabletLandscape = ControlBounds(24, 24, 2536, 1576)
+
+        val phoneStyle = computeMirrorWindowRect(
+            safe = tabletPortrait,
+            videoWidth = 1080,
+            videoHeight = 2400,
+            topDragReservePx = topDragReserve,
+            sideBarFootprintPx = sideBarFootprint,
+            minShortSidePx = minShortSide,
+            tabletMode = false,
+        )
+        val tabletStyle = computeMirrorWindowRect(
+            safe = tabletPortrait,
+            videoWidth = 1080,
+            videoHeight = 2400,
+            topDragReservePx = topDragReserve,
+            sideBarFootprintPx = sideBarFootprint,
+            minShortSidePx = minShortSide,
+            tabletMode = true,
+        )
+        assertTrue("Tablet default should exceed phone default height", tabletStyle.height > phoneStyle.height + 150)
+        assertTrue(tabletStyle.left >= tabletPortrait.left + sideBarFootprint)
+        assertEquals(1080f / 2400f, tabletStyle.width.toFloat() / tabletStyle.height.toFloat(), 0.01f)
+
+        val landscapeTabletStyle = computeMirrorWindowRect(
+            safe = tabletLandscape,
+            videoWidth = 1080,
+            videoHeight = 2400,
+            topDragReservePx = topDragReserve,
+            sideBarFootprintPx = sideBarFootprint,
+            minShortSidePx = minShortSide,
+            tabletMode = true,
+        )
+        assertTrue(landscapeTabletStyle.left >= tabletLandscape.left + sideBarFootprint)
+        assertTrue(landscapeTabletStyle.height >= ((tabletLandscape.height - topDragReserve) * 0.85f).toInt())
+    }
+
+    @Test
+    fun maximizeAndFullscreenExpandWhilePreservingAspectRatio() {
+        val tabletLandscape = ControlBounds(24, 24, 2536, 1576)
+        val maxRect = maximizeMirrorWindowRect(
+            safe = tabletLandscape,
+            videoWidth = 1080,
+            videoHeight = 2400,
+            topDragReservePx = topDragReserve,
+            minShortSidePx = minShortSide,
+        )
+        assertEquals(tabletLandscape.height - topDragReserve, maxRect.height, 2)
+        assertTrue(maxRect.top >= tabletLandscape.top + topDragReserve)
+        assertEquals(1080f / 2400f, maxRect.width.toFloat() / maxRect.height.toFloat(), 0.01f)
+
+        val fullRect = computeFullscreenMirrorRect(2560, 1600, 1080, 2400)
+        assertEquals(1600, fullRect.height, 1)
+        assertEquals(0, fullRect.top)
+        assertEquals(1080f / 2400f, fullRect.width.toFloat() / fullRect.height.toFloat(), 0.01f)
+
+        val landscapeVideoFull = computeFullscreenMirrorRect(2560, 1600, 2400, 1080)
+        assertEquals(2560, landscapeVideoFull.width, 1)
+        assertEquals(0, landscapeVideoFull.left)
+        assertEquals(2400f / 1080f, landscapeVideoFull.width.toFloat() / landscapeVideoFull.height.toFloat(), 0.01f)
+    }
+
+    @Test
+    fun restoringFromMaximizeOrFullscreenRecoversExactWindowedGeometry() {
+        val tabletLandscape = ControlBounds(24, 24, 2536, 1576)
+        val initial = computeMirrorWindowRect(
+            safe = tabletLandscape,
+            videoWidth = 1080,
+            videoHeight = 2400,
+            topDragReservePx = topDragReserve,
+            sideBarFootprintPx = sideBarFootprint,
+            minShortSidePx = minShortSide,
+            tabletMode = true,
+        )
+        val customSized = resizeMirrorWindowFromCorner(
+            start = initial,
+            totalDeltaX = -120f,
+            totalDeltaY = -240f,
+            safe = tabletLandscape,
+            videoWidth = 1080,
+            videoHeight = 2400,
+            topDragReservePx = topDragReserve,
+            minShortSidePx = minShortSide,
+        )
+        val customMoved = dragMirrorWindow(customSized, 260f, -60f, tabletLandscape, topDragReserve)
+        val savedFractions = mirrorWindowToFractions(customMoved, tabletLandscape, 1080, 2400, topDragReserve)
+
+        val restored = computeMirrorWindowRect(
+            safe = tabletLandscape,
+            videoWidth = 1080,
+            videoHeight = 2400,
+            topDragReservePx = topDragReserve,
+            sideBarFootprintPx = sideBarFootprint,
+            minShortSidePx = minShortSide,
+            saved = savedFractions,
+            tabletMode = true,
+        )
+        assertEquals(customMoved.left, restored.left, 2)
+        assertEquals(customMoved.top, restored.top, 2)
+        assertEquals(customMoved.width, restored.width, 2)
+        assertEquals(customMoved.height, restored.height, 2)
+    }
+
     private fun assertEquals(expected: Int, actual: Int, tolerance: Int) {
         assertTrue("Expected $expected +/- $tolerance, got $actual", abs(expected - actual) <= tolerance)
     }

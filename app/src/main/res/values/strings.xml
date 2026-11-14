@@ -368,4 +368,17 @@
     <string name="overlay_active_body">The remote screen is floating over your apps so you can drag, resize, and multitask freely.</string>
     <string name="overlay_hide_app">Return to background</string>
     <string name="overlay_switch_in_app">Switch to in-app view</string>
+
+    <!-- Tablet mirroring floating control strip & window modes -->
+    <string name="mirror_control_zoom_in">Zoom in</string>
+    <string name="mirror_control_zoom_out">Zoom out</string>
+    <string name="mirror_control_reset_zoom">Reset zoom (%1$.1f×)</string>
+    <string name="mirror_control_fit_screen">Fit to screen</string>
+    <string name="mirror_control_pan_mode">Pan and zoom gestures</string>
+    <string name="mirror_control_maximize">Maximize window</string>
+    <string name="mirror_control_restore_window">Restore window</string>
+    <string name="mirror_control_fullscreen">Fullscreen</string>
+    <string name="mirror_control_exit_fullscreen">Exit fullscreen</string>
+    <string name="mirror_control_disconnect">Disconnect</string>
+    <string name="mirror_control_wake_strip">Show mirror controls</string>
 </resources>

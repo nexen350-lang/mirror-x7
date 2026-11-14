@@ -8,6 +8,13 @@ import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
 
+/** Display mode of the mirror viewing window on tablet and phone viewports. */
+internal enum class MirrorWindowMode {
+    WINDOWED,
+    MAXIMIZED,
+    FULLSCREEN,
+}
+
 /** Normalized position and size of a floating mirror window within the available viewport. */
 internal data class MirrorWindowFractions(
     val xFraction: Float,
@@ -97,7 +104,8 @@ private fun snapWindowDimensions(
 /**
  * Computes the mirror window's pixel rectangle inside [safe] while preserving the remote video's
  * aspect ratio. When [saved] is null, centers the window at a comfortable phone-mirroring size
- * that leaves room on the left for the attached vertical control bar.
+ * (expanded generously when [tabletMode] is true) that leaves room on the left for the attached
+ * vertical control bar.
  */
 internal fun computeMirrorWindowRect(
     safe: ControlBounds,
@@ -107,6 +115,7 @@ internal fun computeMirrorWindowRect(
     sideBarFootprintPx: Int,
     minShortSidePx: Int,
     saved: MirrorWindowFractions? = null,
+    tabletMode: Boolean = false,
 ): MirrorWindowRect {
     val aspect = safeAspect(videoWidth, videoHeight)
     val (maxW, _) = maxWindowDimensions(safe, aspect, topDragReservePx)
@@ -139,17 +148,19 @@ internal fun computeMirrorWindowRect(
         leftPx = (safe.left + xFrac * (maxLeft - safe.left)).roundToInt()
         topPx = (minTop + yFrac * (maxTop - minTop)).roundToInt()
     } else {
-        // Default: centered phone-sized frame leaving balanced space for the left control bar
-        // and the right floating handle whenever the screen is wide enough.
+        // Default: centered frame leaving balanced space for the left control bar and floating
+        // handle. Tablets get a noticeably larger default footprint (~88% of safe height/width)
+        // so the mirrored phone makes generous use of the large display.
         val balancedSideMargin = sideBarFootprintPx.toFloat()
         val availW = safe.width.coerceAtLeast(1).toFloat()
         val availH = (safe.height - topDragReservePx).coerceAtLeast(1).toFloat()
+        val fillRatio = if (tabletMode) 0.88f else 0.78f
         val targetMaxW = if (availW > balancedSideMargin * 2f + minW) {
-            min(availW * 0.78f, availW - balancedSideMargin * 2f)
+            min(availW * fillRatio, availW - balancedSideMargin * 2f)
         } else {
             (availW - balancedSideMargin).coerceAtLeast(availW * 0.72f)
         }
-        val targetMaxH = availH * 0.78f
+        val targetMaxH = availH * fillRatio
         val defaultW = if (targetMaxW / targetMaxH > aspect) {
             targetMaxH * aspect
         } else {
@@ -180,6 +191,63 @@ internal fun computeMirrorWindowRect(
     }
 
     return MirrorWindowRect(leftPx, topPx, widthPx, heightPx)
+}
+
+/**
+ * Maximizes the mirror window to occupy nearly the entire safe display area while keeping the
+ * top drag handle reachable and strictly preserving the remote video's aspect ratio.
+ */
+internal fun maximizeMirrorWindowRect(
+    safe: ControlBounds,
+    videoWidth: Int,
+    videoHeight: Int,
+    topDragReservePx: Int,
+    minShortSidePx: Int,
+): MirrorWindowRect {
+    val aspect = safeAspect(videoWidth, videoHeight)
+    val (maxW, _) = maxWindowDimensions(safe, aspect, topDragReservePx)
+    val (widthPx, heightPx) = snapWindowDimensions(
+        desiredW = maxW,
+        safe = safe,
+        videoWidth = videoWidth,
+        videoHeight = videoHeight,
+        topDragReservePx = topDragReservePx,
+        minShortSidePx = minShortSidePx,
+    )
+    val minTop = safe.top + topDragReservePx
+    val maxLeft = max(safe.left, safe.right - widthPx)
+    val maxTop = max(minTop, safe.bottom - heightPx)
+    val leftPx = (safe.left + (safe.width - widthPx) / 2).coerceIn(safe.left, maxLeft)
+    val topPx = (minTop + (maxTop - minTop) / 2).coerceIn(minTop, maxTop)
+    return MirrorWindowRect(leftPx, topPx, widthPx, heightPx)
+}
+
+/**
+ * Computes the edge-to-edge fullscreen presentation rectangle inside the full viewport
+ * ([viewportWidth] x [viewportHeight]) preserving the original remote aspect ratio with zero crop.
+ */
+internal fun computeFullscreenMirrorRect(
+    viewportWidth: Int,
+    viewportHeight: Int,
+    videoWidth: Int,
+    videoHeight: Int,
+): MirrorWindowRect {
+    val fitted = VideoLayout.fitCentered(
+        viewWidth = viewportWidth.coerceAtLeast(1),
+        viewHeight = viewportHeight.coerceAtLeast(1),
+        videoWidth = videoWidth.coerceAtLeast(1),
+        videoHeight = videoHeight.coerceAtLeast(1),
+    )
+    return if (fitted.isValid) {
+        MirrorWindowRect(
+            left = fitted.contentLeft.toInt(),
+            top = fitted.contentTop.toInt(),
+            width = fitted.contentWidth.toInt().coerceAtLeast(1),
+            height = fitted.contentHeight.toInt().coerceAtLeast(1),
+        )
+    } else {
+        MirrorWindowRect(0, 0, viewportWidth.coerceAtLeast(1), viewportHeight.coerceAtLeast(1))
+    }
 }
 
 /** Moves [current] by ([deltaX], [deltaY]) while keeping the window and top drag bar reachable. */

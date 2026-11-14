@@ -2,6 +2,7 @@ package com.scrcpy.remote.ui
 
 import android.os.SystemClock
 import android.view.InputDevice
+import android.view.KeyEvent
 import android.view.MotionEvent
 import android.view.View
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -570,6 +571,135 @@ class ScrcpyMirrorViewTest {
         return try { view.onGenericMotionEvent(event) } finally { event.recycle() }
     }
 
+    @Test
+    fun twoFingerPinchZoomsSmoothlyWithoutLeavingRemotePointersPressed() = onMainThread {
+        val view = newView()
+        view.setVideoSize(1080, 2400)
+        measureAndLayout(view, 1080, 2400)
+        val touches = collectTouches(view)
+
+        val p1Start = Pointer(1, 440f, 1200f)
+        val p2Start = Pointer(2, 640f, 1200f)
+        send(view, MotionEvent.ACTION_DOWN, p1Start)
+        send(view, MotionEvent.ACTION_POINTER_DOWN or (1 shl MotionEvent.ACTION_POINTER_INDEX_SHIFT), p1Start, p2Start)
+
+        // Spread fingers well past pinch slop (from 200px apart to 600px apart).
+        val p1Move = Pointer(1, 240f, 1200f)
+        val p2Move = Pointer(2, 840f, 1200f)
+        send(view, MotionEvent.ACTION_MOVE, p1Move, p2Move)
+        send(view, MotionEvent.ACTION_MOVE, Pointer(1, 140f, 1200f), Pointer(2, 940f, 1200f))
+        send(view, MotionEvent.ACTION_POINTER_UP or (1 shl MotionEvent.ACTION_POINTER_INDEX_SHIFT),
+            Pointer(1, 140f, 1200f), Pointer(2, 940f, 1200f))
+        send(view, MotionEvent.ACTION_UP, Pointer(1, 140f, 1200f))
+
+        measureAndLayout(view, 1080, 2400)
+        assertTrue("Pinch out must enlarge zoom, got ${view.zoom}", view.zoom > 1.3f)
+        val downs = touches.count { it.action == MirrorViewModelActions.DOWN }
+        val ups = touches.count { it.action == MirrorViewModelActions.UP }
+        assertEquals("Any initial remote pointer must be cleanly lifted upon pinch", downs, ups)
+    }
+
+    @Test
+    fun localZoomModeAllowsSingleFingerPanAndDoubleTapToggleWithoutRemoteTouches() = onMainThread {
+        val view = newView()
+        view.setVideoSize(1000, 1000)
+        measureAndLayout(view, 1000, 1000)
+        view.localZoomMode = true
+        val touches = collectTouches(view)
+
+        // Double-tap toggles 1x -> 2x.
+        val t0 = SystemClock.uptimeMillis() + 10_000L
+        sendTimed(view, MotionEvent.ACTION_DOWN, t0, t0, Pointer(1, 500f, 500f))
+        sendTimed(view, MotionEvent.ACTION_UP, t0, t0 + 20L, Pointer(1, 500f, 500f))
+        sendTimed(view, MotionEvent.ACTION_DOWN, t0 + 60L, t0 + 60L, Pointer(1, 500f, 500f))
+        sendTimed(view, MotionEvent.ACTION_UP, t0 + 60L, t0 + 80L, Pointer(1, 500f, 500f))
+        measureAndLayout(view, 1000, 1000)
+        assertEquals(2f, view.zoom, 0.01f)
+
+        // Single-finger drag pans locally while zoomed.
+        val beforeLeft = requireNotNull(view.contentRect).contentLeft
+        sendTimed(view, MotionEvent.ACTION_DOWN, t0 + 200L, t0 + 200L, Pointer(1, 300f, 500f))
+        sendTimed(view, MotionEvent.ACTION_MOVE, t0 + 200L, t0 + 220L, Pointer(1, 450f, 500f))
+        sendTimed(view, MotionEvent.ACTION_UP, t0 + 200L, t0 + 240L, Pointer(1, 450f, 500f))
+        measureAndLayout(view, 1000, 1000)
+        assertTrue(requireNotNull(view.contentRect).contentLeft > beforeLeft)
+
+        // Second double-tap fits back to 1x.
+        sendTimed(view, MotionEvent.ACTION_DOWN, t0 + 400L, t0 + 400L, Pointer(1, 500f, 500f))
+        sendTimed(view, MotionEvent.ACTION_UP, t0 + 400L, t0 + 420L, Pointer(1, 500f, 500f))
+        sendTimed(view, MotionEvent.ACTION_DOWN, t0 + 460L, t0 + 460L, Pointer(1, 500f, 500f))
+        sendTimed(view, MotionEvent.ACTION_UP, t0 + 460L, t0 + 480L, Pointer(1, 500f, 500f))
+        measureAndLayout(view, 1000, 1000)
+        assertEquals(1f, view.zoom, 0.01f)
+        assertTrue("Local zoom mode must never send remote touches", touches.isEmpty())
+    }
+
+    @Test
+    fun ctrlScrollZoomsAroundCursorWithoutForwardingRemoteScroll() = onMainThread {
+        val view = newView()
+        view.setVideoSize(1000, 1000)
+        measureAndLayout(view, 1000, 1000)
+        var remoteScrolls = 0
+        view.onScroll = { _, _, _, _, _, _ -> remoteScrolls++ }
+
+        val event = mouseEvent(MotionEvent.ACTION_SCROLL, 250f, 250f, 0, 0, vertical = 1f, metaState = KeyEvent.META_CTRL_ON)
+        val handled = try { view.onGenericMotionEvent(event) } finally { event.recycle() }
+        measureAndLayout(view, 1000, 1000)
+
+        assertTrue(handled)
+        assertTrue("Ctrl+Scroll up should zoom in", view.zoom > 1.1f)
+        assertEquals(0, remoteScrolls)
+    }
+
+    @Test
+    fun touchMappingRemainsAccurateAcrossResizedContainerDimensions() = onMainThread {
+        val view = newView()
+        view.setVideoSize(1080, 2400)
+        val touches = collectTouches(view)
+
+        for ((containerW, containerH) in listOf(450 to 1000, 900 to 2000, 720 to 1600)) {
+            measureAndLayout(view, containerW, containerH)
+            touches.clear()
+            val cx = containerW / 2f
+            val cy = containerH / 2f
+            send(view, MotionEvent.ACTION_DOWN, Pointer(1, cx, cy))
+            send(view, MotionEvent.ACTION_UP, Pointer(1, cx, cy))
+            assertTrue(kotlin.math.abs(touches.first().x - 540) <= 2)
+            assertTrue(kotlin.math.abs(touches.first().y - 1200) <= 2)
+        }
+    }
+
+    private fun sendTimed(
+        view: ScrcpyMirrorView,
+        action: Int,
+        downTime: Long,
+        eventTime: Long,
+        vararg pointers: Pointer,
+    ): Boolean {
+        val event = MotionEvent.obtain(
+            downTime,
+            eventTime,
+            action,
+            pointers.size,
+            pointers.map { pointer ->
+                MotionEvent.PointerProperties().apply {
+                    id = pointer.id
+                    toolType = MotionEvent.TOOL_TYPE_FINGER
+                }
+            }.toTypedArray(),
+            pointers.map { pointer ->
+                MotionEvent.PointerCoords().apply {
+                    x = pointer.x
+                    y = pointer.y
+                    pressure = 1f
+                    size = 1f
+                }
+            }.toTypedArray(),
+            0, 0, 1f, 1f, 0, 0, InputDevice.SOURCE_TOUCHSCREEN, 0,
+        )
+        return try { view.onTouchEvent(event) } finally { event.recycle() }
+    }
+
     private fun mouseEvent(
         action: Int,
         x: Float,
@@ -577,6 +707,7 @@ class ScrcpyMirrorViewTest {
         buttonState: Int,
         actionButton: Int,
         vertical: Float = 0f,
+        metaState: Int = 0,
     ): MotionEvent {
         val now = SystemClock.uptimeMillis()
         val properties = arrayOf(MotionEvent.PointerProperties().apply {
@@ -591,7 +722,7 @@ class ScrcpyMirrorViewTest {
             if (vertical != 0f) setAxisValue(MotionEvent.AXIS_VSCROLL, vertical)
         })
         val event = MotionEvent.obtain(now, now, action, 1, properties, coords,
-            0, buttonState, 1f, 1f, 0, 0, InputDevice.SOURCE_MOUSE, 0)
+            metaState, buttonState, 1f, 1f, 0, 0, InputDevice.SOURCE_MOUSE, 0)
         if (actionButton != 0) {
             // actionButton has no obtain() parameter; the framework exposes it only through the
             // hidden setter, so reflect when available and otherwise rely on buttonState.

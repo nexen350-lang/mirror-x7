@@ -101,4 +101,15 @@
     <string name="overlay_active_body">نافذة الهاتف متاحة الآن فوق التطبيقات ويمكنك تحريكها وتكبيرها وتصغيرها بحرية.</string>
     <string name="overlay_hide_app">العودة للخلفية</string>
     <string name="overlay_switch_in_app">العرض داخل التطبيق</string>
+    <string name="mirror_control_zoom_in">تكبير العرض</string>
+    <string name="mirror_control_zoom_out">تصغير العرض</string>
+    <string name="mirror_control_reset_zoom">إعادة تعيين التكبير (%1$.1f×)</string>
+    <string name="mirror_control_fit_screen">ملاءمة للشاشة</string>
+    <string name="mirror_control_pan_mode">وضع التحريك والتكبير</string>
+    <string name="mirror_control_maximize">تكبير النافذة</string>
+    <string name="mirror_control_restore_window">استعادة حجم النافذة</string>
+    <string name="mirror_control_fullscreen">ملء الشاشة</string>
+    <string name="mirror_control_exit_fullscreen">الخروج من ملء الشاشة</string>
+    <string name="mirror_control_disconnect">قطع الاتصال</string>
+    <string name="mirror_control_wake_strip">إظهار أدوات العرض</string>
 </resources>

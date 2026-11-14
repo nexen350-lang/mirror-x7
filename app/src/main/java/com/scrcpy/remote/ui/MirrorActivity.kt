@@ -42,6 +42,7 @@ import kotlinx.coroutines.withContext
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Arrangement
@@ -100,6 +101,7 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalResources
@@ -109,6 +111,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.viewinterop.AndroidView
+import kotlin.math.abs
 import kotlin.math.roundToInt
 import androidx.core.content.IntentCompat
 import androidx.core.os.BundleCompat
@@ -157,6 +160,7 @@ class MirrorActivity : ComponentActivity() {
     private var pipDialogOpen = false
     private var activityStarted by mutableStateOf(false)
     private var overlayActive by mutableStateOf(false)
+    private var overlayRequested by mutableStateOf(false)
     private var overlayDisabledForSession by mutableStateOf(false)
     private var pendingOverlayPermissionLaunch by mutableStateOf(false)
     private var showOverlayPermissionDialog by mutableStateOf(false)
@@ -479,6 +483,7 @@ class MirrorActivity : ComponentActivity() {
         if (current == null || !sameEndpoint(current.host, current.port, next.host, next.port)) {
             viewModel.setInputLocked(false)
         }
+        overlayRequested = false
         overlayDisabledForSession = false
         exitAfterRecording = false
         setIntent(intent)
@@ -516,6 +521,7 @@ class MirrorActivity : ComponentActivity() {
         // memory: the rebuilt screen reconnected to the first device and queued a sent file again.
         savedInstanceState?.let { BundleCompat.getParcelable(it, STATE_TARGET, Intent::class.java) }?.let(::setIntent)
         exitAfterRecording = savedInstanceState?.getBoolean(STATE_EXIT_AFTER_RECORDING) == true
+        overlayRequested = savedInstanceState?.getBoolean(STATE_OVERLAY_REQUESTED) == true
         pipMode = isInPictureInPictureMode
         pipCloseArmed = pipMode
         documentPickerOpen = savedInstanceState?.getBoolean(STATE_DOCUMENT_PICKER) == true
@@ -704,6 +710,7 @@ class MirrorActivity : ComponentActivity() {
                             if (overlayActive) moveTaskToBack(true)
                         },
                         onSwitchToInApp = {
+                            overlayRequested = false
                             overlayDisabledForSession = true
                             deactivateOverlay()
                         },
@@ -802,7 +809,9 @@ class MirrorActivity : ComponentActivity() {
     private fun reconcileOverlayMode() {
         val connected = viewModel.state.value as? MirrorUiState.Connected
         val isScreenSession = connected != null && viewModel.activeSettings.value?.camera == null
-        if (!isScreenSession || hideSessionTools || isInPictureInPictureMode || overlayDisabledForSession) {
+        if (!overlayRequested || !isScreenSession || hideSessionTools ||
+            isInPictureInPictureMode || overlayDisabledForSession
+        ) {
             showOverlayPermissionDialog = false
             deactivateOverlay()
             return
@@ -987,6 +996,7 @@ class MirrorActivity : ComponentActivity() {
     override fun onSaveInstanceState(outState: Bundle) {
         outState.putParcelable(STATE_TARGET, Intent(intent))
         outState.putBoolean(STATE_EXIT_AFTER_RECORDING, exitAfterRecording)
+        outState.putBoolean(STATE_OVERLAY_REQUESTED, overlayRequested)
         outState.putBoolean(STATE_DOCUMENT_PICKER, documentPickerOpen)
         outState.putBoolean(STATE_SHARE_CHOOSER, shareChooserOpen)
         outState.putParcelable(STATE_PENDING_TARGET, pendingMirrorIntent)
@@ -1014,6 +1024,7 @@ class MirrorActivity : ComponentActivity() {
         private const val ACTION_RETURN_FROM_PIP = "com.scrcpy.remote.RETURN_FROM_CAMERA_PIP"
         private const val PIP_RETURN_TIMEOUT_MS = 5_000L
         private const val STATE_EXIT_AFTER_RECORDING = "mirror.exitAfterRecording"
+        private const val STATE_OVERLAY_REQUESTED = "mirror.overlayRequested"
         private const val STATE_DOCUMENT_PICKER = "mirror.documentPicker"
         private const val STATE_SHARE_CHOOSER = "mirror.shareChooser"
         private const val STATE_PENDING_TARGET = "mirror.pendingTarget"
@@ -1189,6 +1200,9 @@ private fun MirrorScreen(
     )
     val localLandscape = viewportSize.width > viewportSize.height
     val remoteLandscape = landscape
+    val tabletMode = LocalConfiguration.current.smallestScreenWidthDp >= 600
+    var windowMode by rememberSaveable { mutableStateOf(MirrorWindowMode.WINDOWED) }
+    var restoreModeBeforeFullscreen by rememberSaveable { mutableStateOf(MirrorWindowMode.WINDOWED) }
     var savedWindowFractions by remember(windowDeviceKey, localLandscape, remoteLandscape) {
         mutableStateOf(
             MirrorWindowPreferences.load(context, windowDeviceKey, localLandscape, remoteLandscape),
@@ -1197,18 +1211,35 @@ private fun MirrorScreen(
     var liveWindowRect by remember { mutableStateOf<MirrorWindowRect?>(null) }
     var draggingWindow by remember { mutableStateOf(false) }
     var resizingWindow by remember { mutableStateOf(false) }
+    val isFullscreen = windowMode == MirrorWindowMode.FULLSCREEN
     val settledWindowRect = if (connected != null && !hideSessionTools &&
         viewportSize.width > 0 && viewportSize.height > 0
     ) {
-        computeMirrorWindowRect(
-            safe = safeWindowBounds,
-            videoWidth = connected.videoWidth,
-            videoHeight = connected.videoHeight,
-            topDragReservePx = topDragReservePx,
-            sideBarFootprintPx = sideBarFootprintPx,
-            minShortSidePx = minShortSidePx,
-            saved = savedWindowFractions,
-        )
+        when (windowMode) {
+            MirrorWindowMode.FULLSCREEN -> computeFullscreenMirrorRect(
+                viewportWidth = viewportSize.width,
+                viewportHeight = viewportSize.height,
+                videoWidth = connected.videoWidth,
+                videoHeight = connected.videoHeight,
+            )
+            MirrorWindowMode.MAXIMIZED -> maximizeMirrorWindowRect(
+                safe = safeWindowBounds,
+                videoWidth = connected.videoWidth,
+                videoHeight = connected.videoHeight,
+                topDragReservePx = topDragReservePx,
+                minShortSidePx = minShortSidePx,
+            )
+            MirrorWindowMode.WINDOWED -> computeMirrorWindowRect(
+                safe = safeWindowBounds,
+                videoWidth = connected.videoWidth,
+                videoHeight = connected.videoHeight,
+                topDragReservePx = topDragReservePx,
+                sideBarFootprintPx = sideBarFootprintPx,
+                minShortSidePx = minShortSidePx,
+                saved = savedWindowFractions,
+                tabletMode = tabletMode,
+            )
+        }
     } else null
     val activeWindowRect = if (connected != null && !hideSessionTools) {
         liveWindowRect ?: settledWindowRect
@@ -1237,10 +1268,13 @@ private fun MirrorScreen(
     var showDiagnostics by rememberSaveable { mutableStateOf(false) }
     var showDetails by rememberSaveable { mutableStateOf(false) }
     var geometry by remember { mutableStateOf<VideoLayout?>(null) }
-    // Magnification of the local view. Deliberately not saved across configuration changes: a
-    // rotation reflows the picture completely, and coming back magnified to a spot that no longer
-    // exists is more disorienting than starting fitted.
-    var viewZoom by remember { mutableFloatStateOf(1f) }
+    // Local tablet zoom level & gesture lock. Preserved across tablet rotation (rememberSaveable)
+    // and reset cleanly only when the remote stream session/capture generation changes.
+    var viewZoom by rememberSaveable { mutableFloatStateOf(1f) }
+    var lastZoomSessionGen by rememberSaveable { mutableLongStateOf(-1L) }
+    var lastZoomCaptureGen by rememberSaveable { mutableLongStateOf(-1L) }
+    var localZoomMode by rememberSaveable { mutableStateOf(false) }
+    var mirrorViewRef by remember { mutableStateOf<ScrcpyMirrorView?>(null) }
     // Precision pad mode for this target, kept across recreation like the session's other
     // controls. Its speed is about this phone's user rather than the device, so it outlives the
     // session; see PrecisionPadPreferences.
@@ -1339,12 +1373,18 @@ private fun MirrorScreen(
     LaunchedEffect(showDiagnostics, hideSessionTools) {
         viewModel.diagnosticsEnabled = showDiagnostics && !hideSessionTools
     }
-    // A new capture — a reconnect, a rotation, or a switch to a camera — reflows the picture
-    // completely, and a magnified corner of the old one lands nowhere meaningful on the new.
-    // Found in live testing: switching to a camera while zoomed left a 4x crop of a feed that
-    // had nothing to do with what had been magnified.
+    // Reset local zoom only when a reconnect or remote capture change reflows the video stream,
+    // while preserving the user's current zoom level smoothly across tablet orientation changes.
     LaunchedEffect(connected?.sessionGeneration, connected?.captureGeneration) {
-        viewZoom = 1f
+        val currentSession = connected ?: return@LaunchedEffect
+        if (lastZoomSessionGen != -1L &&
+            (lastZoomSessionGen != currentSession.sessionGeneration ||
+                lastZoomCaptureGen != currentSession.captureGeneration)
+        ) {
+            viewZoom = 1f
+        }
+        lastZoomSessionGen = currentSession.sessionGeneration
+        lastZoomCaptureGen = currentSession.captureGeneration
     }
     LaunchedEffect(notice, hideSessionTools) {
         if (!hideSessionTools) notice?.let { snackbar.showSnackbar(it); viewModel.clearNotice() }
@@ -1376,7 +1416,13 @@ private fun MirrorScreen(
         }
     }
     BackHandler(enabled = !hideSessionTools) {
-        if (state is MirrorUiState.Connected) confirmLeave = true else onDisconnect()
+        if (isFullscreen && state is MirrorUiState.Connected) {
+            windowMode = restoreModeBeforeFullscreen
+        } else if (state is MirrorUiState.Connected) {
+            confirmLeave = true
+        } else {
+            onDisconnect()
+        }
     }
     if (showDiagnosis && state is MirrorUiState.Failed) failureReport?.let { report ->
         ConnectionDiagnosisDialog(
@@ -1436,7 +1482,7 @@ private fun MirrorScreen(
                     onDisconnect = { confirmLeave = true },
                 )
             } else {
-                val windowCornerRadiusPx = if (activeWindowRect != null) {
+                val windowCornerRadiusPx = if (activeWindowRect != null && !isFullscreen) {
                     val minSide = minOf(activeWindowRect.width, activeWindowRect.height).toFloat()
                     (minSide * 0.095f).coerceIn(
                         with(density) { MIRROR_WINDOW_MIN_CORNER_RADIUS.toPx() },
@@ -1466,8 +1512,11 @@ private fun MirrorScreen(
                                 cameraSession = activeSettings?.camera != null,
                                 inputState = inputState,
                                 zoom = viewZoom,
+                                localZoomMode = localZoomMode,
                                 cornerRadiusPx = windowCornerRadiusPx,
                                 onGeometryChanged = { geometry = it },
+                                onZoomChanged = { viewZoom = it },
+                                onViewReady = { mirrorViewRef = it },
                                 onSurfaceBound = onSurfaceBound,
                                 precisionPad = padActive,
                                 padSpeed = padSpeed,
@@ -1475,7 +1524,7 @@ private fun MirrorScreen(
                                 hiddenFromAccessibility = controlsModal,
                             )
                         }
-                        if (activeWindowRect != null) {
+                        if (activeWindowRect != null && !isFullscreen) {
                             MirrorWindowChrome(
                                 cornerRadiusPx = windowCornerRadiusPx,
                                 active = draggingWindow || resizingWindow,
@@ -1483,7 +1532,7 @@ private fun MirrorScreen(
                             )
                         }
                     }
-                    if (activeWindowRect != null && !inputState.locked) {
+                    if (activeWindowRect != null && !isFullscreen && !inputState.locked) {
                         val latestSafe by rememberUpdatedState(safeWindowBounds)
                         val latestWindow by rememberUpdatedState(activeWindowRect)
                         val latestVideoW by rememberUpdatedState(current.videoWidth)
@@ -1511,6 +1560,9 @@ private fun MirrorScreen(
                             windowRect = activeWindowRect,
                             active = draggingWindow,
                             onDragStart = {
+                                if (windowMode == MirrorWindowMode.MAXIMIZED) {
+                                    windowMode = MirrorWindowMode.WINDOWED
+                                }
                                 draggingWindow = true
                                 liveWindowRect = latestWindow
                                 latestWindow
@@ -1529,6 +1581,10 @@ private fun MirrorScreen(
                                 liveWindowRect?.let(::persistWindow)
                                 liveWindowRect = null
                             },
+                            onDoubleTap = {
+                                restoreModeBeforeFullscreen = windowMode
+                                windowMode = MirrorWindowMode.FULLSCREEN
+                            },
                         )
                         MirrorWindowCornerResizeHandle(
                             windowRect = activeWindowRect,
@@ -1536,6 +1592,9 @@ private fun MirrorScreen(
                             cornerRadiusPx = windowCornerRadiusPx,
                             active = resizingWindow,
                             onResizeStart = {
+                                if (windowMode == MirrorWindowMode.MAXIMIZED) {
+                                    windowMode = MirrorWindowMode.WINDOWED
+                                }
                                 resizingWindow = true
                                 liveWindowRect = latestWindow
                                 latestWindow
@@ -1595,6 +1654,49 @@ private fun MirrorScreen(
                 }
             }
 
+            if (!padActive && !inputState.locked && !controlsModal) {
+                ScrcpyRemoteTheme(darkTheme = true) {
+                    MirrorControlStrip(
+                        zoom = viewZoom,
+                        localZoomMode = localZoomMode,
+                        windowMode = windowMode,
+                        onZoomIn = {
+                            val target = (viewZoom * 2f).coerceAtMost(VideoLayout.MAX_ZOOM)
+                            mirrorViewRef?.animateZoomTo(target) ?: run { viewZoom = target }
+                        },
+                        onZoomOut = {
+                            val target = (viewZoom / 2f).coerceAtLeast(1f)
+                            mirrorViewRef?.animateZoomTo(target) ?: run { viewZoom = target }
+                        },
+                        onResetZoom = {
+                            mirrorViewRef?.animateZoomTo(1f) ?: run { viewZoom = 1f }
+                        },
+                        onFitToScreen = {
+                            mirrorViewRef?.animateZoomTo(1f) ?: run { viewZoom = 1f }
+                        },
+                        onToggleLocalZoomMode = { localZoomMode = !localZoomMode },
+                        onToggleMaximize = {
+                            liveWindowRect = null
+                            windowMode = if (windowMode == MirrorWindowMode.MAXIMIZED) {
+                                MirrorWindowMode.WINDOWED
+                            } else {
+                                MirrorWindowMode.MAXIMIZED
+                            }
+                        },
+                        onToggleFullscreen = {
+                            liveWindowRect = null
+                            if (windowMode == MirrorWindowMode.FULLSCREEN) {
+                                windowMode = restoreModeBeforeFullscreen
+                            } else {
+                                restoreModeBeforeFullscreen = windowMode
+                                windowMode = MirrorWindowMode.FULLSCREEN
+                            }
+                        },
+                        onDisconnect = { confirmLeave = true },
+                    )
+                }
+            }
+
             FloatingControlsOverlay(
                 actions = rememberMirrorActions(
                     viewModel = viewModel,
@@ -1650,12 +1752,16 @@ private fun MirrorScreen(
                     // a step that doubles reaches the useful range in three presses.
                     viewZoom = viewZoom,
                     onViewZoomIn = {
-                        viewZoom = (viewZoom * 2f).coerceAtMost(VideoLayout.MAX_ZOOM)
+                        val target = (viewZoom * 2f).coerceAtMost(VideoLayout.MAX_ZOOM)
+                        mirrorViewRef?.animateZoomTo(target) ?: run { viewZoom = target }
                     },
                     onViewZoomOut = {
-                        viewZoom = (viewZoom / 2f).coerceAtLeast(1f)
+                        val target = (viewZoom / 2f).coerceAtLeast(1f)
+                        mirrorViewRef?.animateZoomTo(target) ?: run { viewZoom = target }
                     },
-                    onViewZoomReset = { viewZoom = 1f },
+                    onViewZoomReset = {
+                        mirrorViewRef?.animateZoomTo(1f) ?: run { viewZoom = 1f }
+                    },
                     onShareScreenshot = onRequestShareScreenshot,
                     onCameraPip = if (pipSupported && activeSettings?.camera != null)
                         onRequestCameraPip else null,
@@ -1676,7 +1782,7 @@ private fun MirrorScreen(
                 },
                 inputLockBanner = lockBanner,
                 onPanelModalChanged = { controlsModal = it },
-                attachedWindow = activeWindowRect?.toControlBounds(),
+                attachedWindow = if (isFullscreen) null else activeWindowRect?.toControlBounds(),
             )
         }
         if (connected == null && inputState.locked && !hideSessionTools) {
@@ -2403,6 +2509,7 @@ private fun MirrorWindowTopDragBar(
     onDragStart: () -> MirrorWindowRect,
     onDrag: (MirrorWindowRect, Float, Float) -> Unit,
     onDragEnd: () -> Unit,
+    onDoubleTap: () -> Unit = {},
 ) {
     val density = LocalDensity.current
     val hitHeightPx = with(density) { MIRROR_WINDOW_TOP_RESERVE.roundToPx() }
@@ -2420,6 +2527,7 @@ private fun MirrorWindowTopDragBar(
     val latestOnDragStart by rememberUpdatedState(onDragStart)
     val latestOnDrag by rememberUpdatedState(onDrag)
     val latestOnDragEnd by rememberUpdatedState(onDragEnd)
+    val latestOnDoubleTap by rememberUpdatedState(onDoubleTap)
 
     Box(
         modifier = Modifier
@@ -2428,6 +2536,9 @@ private fun MirrorWindowTopDragBar(
             .onPlaced { nodePosInRoot = it.positionInRoot() }
             .testTag("mirror-window-drag-bar")
             .semantics { contentDescription = label }
+            .pointerInput(Unit) {
+                detectTapGestures(onDoubleTap = { latestOnDoubleTap() })
+            }
             .pointerInput(Unit) {
                 var startRect: MirrorWindowRect? = null
                 var startFingerRoot = Offset.Zero
@@ -2563,8 +2674,11 @@ private fun MirrorSurface(
     cameraSession: Boolean,
     inputState: com.scrcpy.remote.session.SessionInputState,
     zoom: Float,
+    localZoomMode: Boolean = false,
     cornerRadiusPx: Float = 0f,
     onGeometryChanged: (VideoLayout) -> Unit,
+    onZoomChanged: (Float) -> Unit = {},
+    onViewReady: (ScrcpyMirrorView?) -> Unit = {},
     onSurfaceBound: (SurfaceView, Boolean) -> Unit,
     precisionPad: Boolean,
     padSpeed: Float,
@@ -2572,6 +2686,8 @@ private fun MirrorSurface(
     hiddenFromAccessibility: Boolean,
 ) {
     val density = LocalDensity.current
+    val latestOnZoomChanged by rememberUpdatedState(onZoomChanged)
+    val latestOnViewReady by rememberUpdatedState(onViewReady)
     val label = stringResource(
         if (inputState.locked) R.string.input_locked_surface_description
         else if (cameraSession) R.string.camera_surface_description
@@ -2588,7 +2704,9 @@ private fun MirrorSurface(
             ScrcpyMirrorView(context).apply {
                 onSurfaceBound(this.screenshotSurface, true)
                 padHandle.view = this
+                latestOnViewReady(this)
                 onPrecisionPadChanged = { dragging, _, cursorY -> padHandle.update(dragging, cursorY) }
+                onZoomChanged = { updatedZoom -> post { latestOnZoomChanged(updatedZoom) } }
                 onTouch = { action, pointerId, x, y, pressure, srcW, srcH, rawX, rawY ->
                     viewModel.sendTouch(action, pointerId, x, y, pressure, srcW, srcH, rawX, rawY,
                         state.sessionGeneration, captureGeneration, this.inputState.generation)
@@ -2616,15 +2734,19 @@ private fun MirrorSurface(
             }
         },
         update = { view ->
+            latestOnViewReady(view)
             view.setInputState(inputState)
             view.applyTouchCalibration(
                 with(density) { settings.touchOffsetXDp.dp.toPx() },
                 with(density) { settings.touchOffsetYDp.dp.toPx() },
             )
             view.captureEdgeGestures = settings.captureEdgeGestures
+            view.localZoomMode = localZoomMode
             view.cornerRadiusPx = cornerRadiusPx
             view.setVideoSize(state.videoWidth, state.videoHeight, state.captureGeneration)
-            view.setZoom(zoom)
+            if (!view.isZoomAnimating && !view.isZoomGestureActive && abs(view.zoom - zoom) > 0.001f) {
+                view.setZoom(zoom)
+            }
             view.precisionPadSpeed = padSpeed
             view.precisionPad = precisionPad
             // The view's own node as well as the Compose one around it.
@@ -2636,6 +2758,8 @@ private fun MirrorSurface(
             view.releaseAllPointers()
             view.onGeometryChanged = null
             view.onPrecisionPadChanged = null
+            view.onZoomChanged = null
+            latestOnViewReady(null)
             if (padHandle.view === view) padHandle.view = null
             onSurfaceBound(view.screenshotSurface, false)
         },
