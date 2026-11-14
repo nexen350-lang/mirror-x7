@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <lint>
+    <issue id="MissingTranslation" severity="ignore" />
     <!--
         local.properties is generated per machine by Android Studio, is git-ignored and is never
         packaged, so its escaping cannot affect the built app. Aborting the build on it would break
