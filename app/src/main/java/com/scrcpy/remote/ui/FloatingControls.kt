@@ -339,7 +339,7 @@ private const val COMPACT_GRID_COLUMNS = 3
  * Keeping the controls in an overlay lets the mirrored video surface use the entire display.
  */
 @Composable
-fun FloatingControlsOverlay(
+internal fun FloatingControlsOverlay(
     actions: MirrorActions,
     muted: Boolean,
     modifier: Modifier = Modifier,
