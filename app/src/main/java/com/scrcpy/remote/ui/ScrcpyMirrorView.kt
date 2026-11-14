@@ -8,12 +8,15 @@ import android.graphics.Outline
 import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.Rect
+import android.graphics.SurfaceTexture
 import android.os.Build
 import android.util.AttributeSet
 import android.view.InputDevice
 import android.view.MotionEvent
+import android.view.Surface
 import android.view.SurfaceHolder
 import android.view.SurfaceView
+import android.view.TextureView
 import android.view.View
 import android.view.ViewConfiguration
 import android.view.ViewGroup
@@ -39,9 +42,19 @@ import com.scrcpy.remote.session.SessionInputState
 class ScrcpyMirrorView @JvmOverloads constructor(
     context: Context,
     attrs: AttributeSet? = null,
+    useTextureView: Boolean = false,
 ) : ViewGroup(context, attrs) {
 
-    private val surfaceView = SurfaceView(context)
+    private val surfaceView: SurfaceView? = if (useTextureView) null else SurfaceView(context)
+    private val textureView: TextureView? = if (useTextureView) {
+        TextureView(context).apply { isOpaque = false }
+    } else null
+    private val renderView: View get() = textureView ?: requireNotNull(surfaceView)
+    private var activeTextureSurface: Surface? = null
+
+    /** Callback for overlay TextureView mode when the rendering surface is ready or released. */
+    var onTextureSurfaceAvailable: ((Surface) -> Unit)? = null
+    var onTextureSurfaceDestroyed: (() -> Unit)? = null
 
     /** Invoked with (action, pointerId, deviceX, deviceY, pressure, videoWidth, videoHeight, rawX, rawY). */
     var onTouch: ((Int, Long, Int, Int, Float, Int, Int, Float, Float) -> Unit)? = null
@@ -142,8 +155,9 @@ class ScrcpyMirrorView @JvmOverloads constructor(
     /** Exposes the rectangle the surface occupies so a diagnostic overlay can invert the mapping. */
     val contentRect: VideoLayout? get() = layout?.takeIf { it.isValid }
 
-    val surfaceHolder: SurfaceHolder get() = surfaceView.holder
-    internal val screenshotSurface: SurfaceView get() = surfaceView
+    val surfaceHolder: SurfaceHolder get() = requireNotNull(surfaceView?.holder)
+    internal val screenshotSurface: SurfaceView get() = requireNotNull(surfaceView)
+    internal val screenshotTexture: TextureView? get() = textureView
 
     /** Adjustment in pixels applied to a touch before mapping; negative moves it up and left. */
     var touchOffsetX: Float = 0f
@@ -196,10 +210,10 @@ class ScrcpyMirrorView @JvmOverloads constructor(
         val rounded = cornerRadiusPx > 0f
         outlineProvider = if (rounded) roundedOutlineProvider else ViewOutlineProvider.BACKGROUND
         clipToOutline = rounded
-        surfaceView.outlineProvider = if (rounded) roundedOutlineProvider else ViewOutlineProvider.BACKGROUND
-        surfaceView.clipToOutline = rounded
+        renderView.outlineProvider = if (rounded) roundedOutlineProvider else ViewOutlineProvider.BACKGROUND
+        renderView.clipToOutline = rounded
         invalidateOutline()
-        surfaceView.invalidateOutline()
+        renderView.invalidateOutline()
     }
 
     private var videoWidth = 0
@@ -250,7 +264,26 @@ class ScrcpyMirrorView @JvmOverloads constructor(
     private data class Sample(val packed: Long, val pressure: Int)
 
     init {
-        addView(surfaceView)
+        textureView?.surfaceTextureListener = object : TextureView.SurfaceTextureListener {
+            override fun onSurfaceTextureAvailable(surfaceTexture: SurfaceTexture, width: Int, height: Int) {
+                activeTextureSurface?.release()
+                val surface = Surface(surfaceTexture)
+                activeTextureSurface = surface
+                onTextureSurfaceAvailable?.invoke(surface)
+            }
+
+            override fun onSurfaceTextureSizeChanged(surfaceTexture: SurfaceTexture, width: Int, height: Int) = Unit
+
+            override fun onSurfaceTextureDestroyed(surfaceTexture: SurfaceTexture): Boolean {
+                onTextureSurfaceDestroyed?.invoke()
+                activeTextureSurface?.release()
+                activeTextureSurface = null
+                return true
+            }
+
+            override fun onSurfaceTextureUpdated(surfaceTexture: SurfaceTexture) = Unit
+        }
+        addView(renderView)
         setWillNotDraw(true)
     }
 
@@ -290,12 +323,12 @@ class ScrcpyMirrorView @JvmOverloads constructor(
         // ends up even if the parent hands us bounds that differ from what we measured.
         val geometry = measureSurface(r - l, b - t)
         if (!geometry.isValid) {
-            surfaceView.layout(0, 0, 0, 0)
+            renderView.layout(0, 0, 0, 0)
             return
         }
         val left = geometry.contentLeft.toInt()
         val top = geometry.contentTop.toInt()
-        surfaceView.layout(
+        renderView.layout(
             left,
             top,
             left + geometry.contentWidth.toInt(),
@@ -303,7 +336,7 @@ class ScrcpyMirrorView @JvmOverloads constructor(
         )
         if (cornerRadiusPx > 0f) {
             invalidateOutline()
-            surfaceView.invalidateOutline()
+            renderView.invalidateOutline()
         }
         onGeometryChanged?.invoke(geometry)
         // Posted like the geometry above: a cursor that moved with the picture is reported once
@@ -315,7 +348,7 @@ class ScrcpyMirrorView @JvmOverloads constructor(
     private fun measureSurface(width: Int, height: Int): VideoLayout {
         val geometry = VideoLayout.fitCentered(width, height, videoWidth, videoHeight, zoom, panX, panY)
         layout = geometry
-        surfaceView.measure(
+        renderView.measure(
             MeasureSpec.makeMeasureSpec(geometry.contentWidth.toInt(), MeasureSpec.EXACTLY),
             MeasureSpec.makeMeasureSpec(geometry.contentHeight.toInt(), MeasureSpec.EXACTLY),
         )

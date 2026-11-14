@@ -8,6 +8,7 @@ import android.app.Service
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
+import android.content.res.Configuration
 import android.os.Build
 import android.os.IBinder
 import android.util.Log
@@ -27,11 +28,23 @@ import kotlinx.coroutines.flow.asStateFlow
  */
 class MirrorSessionService : Service() {
 
+    interface OverlayController {
+        fun attach(service: Service): Boolean
+        fun detach()
+        fun onConfigurationChanged()
+    }
+
+    override fun onCreate() {
+        super.onCreate()
+        serviceInstance = this
+    }
+
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (intent?.action == ACTION_STOP) {
             _stopRequests.value++
+            detachController()
             synchronized(startLock) {
                 stopPending = true
                 if (pendingForegroundStarts == 0) stopSelf(startId)
@@ -43,13 +56,35 @@ class MirrorSessionService : Service() {
             SessionHold.valueOf(intent?.getStringExtra(EXTRA_HOLD) ?: SessionHold.CONNECTED.name)
         }.getOrDefault(SessionHold.CONNECTED)
         startForegroundCompat(notification(device, hold), hold)
+        var shouldStop = false
         synchronized(startLock) {
             if (pendingForegroundStarts > 0) pendingForegroundStarts--
-            if (stopPending && pendingForegroundStarts == 0) stopSelf(startId)
+            if (stopPending && pendingForegroundStarts == 0) {
+                shouldStop = true
+            }
+        }
+        if (shouldStop) {
+            detachController()
+            stopSelf(startId)
+        } else {
+            attachControllerIfNeeded(this)
         }
         // The session lives in the Activity's ViewModel, so a restart with no session would only
         // show a notification for something that is not running.
         return START_NOT_STICKY
+    }
+
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        super.onConfigurationChanged(newConfig)
+        activeController?.onConfigurationChanged()
+    }
+
+    override fun onDestroy() {
+        detachController()
+        if (serviceInstance === this) {
+            serviceInstance = null
+        }
+        super.onDestroy()
     }
 
     /**
@@ -194,6 +229,7 @@ class MirrorSessionService : Service() {
         }
 
         fun stop(context: Context) {
+            detachController()
             synchronized(startLock) {
                 stopPending = true
                 // Stopping before the first startForeground() acknowledgement can crash the
@@ -201,6 +237,37 @@ class MirrorSessionService : Service() {
                 if (pendingForegroundStarts == 0) {
                     context.stopService(Intent(context, MirrorSessionService::class.java))
                 }
+            }
+        }
+
+        private var serviceInstance: MirrorSessionService? = null
+        private var activeController: OverlayController? = null
+        private var attachedToService = false
+
+        fun setOverlayController(controller: OverlayController?): Boolean {
+            if (activeController === controller) {
+                return attachControllerIfNeeded(serviceInstance)
+            }
+            detachController()
+            activeController = controller
+            return attachControllerIfNeeded(serviceInstance)
+        }
+
+        private fun attachControllerIfNeeded(service: MirrorSessionService?): Boolean {
+            val controller = activeController ?: return false
+            if (service == null) return false
+            if (!attachedToService) {
+                attachedToService = controller.attach(service)
+            }
+            return attachedToService
+        }
+
+        private fun detachController() {
+            val controller = activeController
+            val wasAttached = attachedToService
+            attachedToService = false
+            if (wasAttached) {
+                controller?.detach()
             }
         }
     }

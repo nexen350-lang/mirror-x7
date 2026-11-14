@@ -86,7 +86,7 @@ class CameraPipPolicyTest {
         assertTrue(mirror.contains("android:resizeableActivity=\"true\""))
         assertTrue(mirror.contains("smallestScreenSize"))
         assertEquals(1, "supportsPictureInPicture".toRegex().findAll(manifest).count())
-        assertFalse(manifest.contains("android.permission.SYSTEM_ALERT_WINDOW"))
+        assertTrue(manifest.contains("android.permission.SYSTEM_ALERT_WINDOW"))
         assertFalse(manifest.contains("android.permission.CAMERA"))
     }
 

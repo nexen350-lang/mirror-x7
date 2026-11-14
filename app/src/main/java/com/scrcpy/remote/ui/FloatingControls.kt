@@ -619,7 +619,7 @@ private fun FloatingControlsContent(
 }
 
 @Composable
-private fun CompactNavigationBar(
+internal fun CompactNavigationBar(
     actions: MirrorActions,
     onMore: () -> Unit,
     onInteraction: () -> Unit,
@@ -790,7 +790,7 @@ private fun Modifier.controlBackgroundInput(): Modifier = pointerInput(Unit) {
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun ControlPanel(
+internal fun ControlPanel(
     actions: MirrorActions,
     muted: Boolean,
     keyboardVisible: Boolean,
@@ -1734,8 +1734,8 @@ internal fun commitTextDraft(value: TextFieldValue, onText: (String) -> Boolean)
     return if (onText(value.text)) TextFieldValue() else value
 }
 
-private val HANDLE_SIZE = 48.dp
-private val HANDLE_MARGIN = 8.dp
+internal val HANDLE_SIZE = 48.dp
+internal val HANDLE_MARGIN = 8.dp
 private val PANEL_MAX_HEIGHT = 440.dp
 
 /** A panel tile is never narrower than this, so its icon and two-line label keep their room. */

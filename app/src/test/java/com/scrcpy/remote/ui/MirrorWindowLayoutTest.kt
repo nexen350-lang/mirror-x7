@@ -69,7 +69,7 @@ class MirrorWindowLayoutTest {
         )
         val expectedAspect = 1080f / 2400f
 
-        for ((dx, dy) in listOf(120f to 240f, -160f to -300f, 200f to 10f, 10f to -280f)) {
+        for ((dx, dy) in listOf(120f to 240f, -160f to -300f, 10f to -280f)) {
             val resized = resizeMirrorWindowFromCorner(
                 start = start,
                 totalDeltaX = dx,
@@ -80,12 +80,30 @@ class MirrorWindowLayoutTest {
                 topDragReservePx = topDragReserve,
                 minShortSidePx = minShortSide,
             )
-            assertEquals("Top-left X stays anchored", start.left, resized.left)
-            assertEquals("Top-left Y stays anchored", start.top, resized.top)
+            assertEquals("Top-left X stays anchored when room permits", start.left, resized.left)
+            assertEquals("Top-left Y stays anchored when room permits", start.top, resized.top)
             assertEquals(expectedAspect, resized.width.toFloat() / resized.height.toFloat(), 0.015f)
             assertTrue(resized.right <= safePortrait.right)
             assertTrue(resized.bottom <= safePortrait.bottom)
         }
+
+        val enlargedBeyondRightEdge = resizeMirrorWindowFromCorner(
+            start = start,
+            totalDeltaX = 200f,
+            totalDeltaY = 10f,
+            safe = safePortrait,
+            videoWidth = 1080,
+            videoHeight = 2400,
+            topDragReservePx = topDragReserve,
+            minShortSidePx = minShortSide,
+        )
+        assertTrue(enlargedBeyondRightEdge.width > start.width + 150)
+        assertTrue(enlargedBeyondRightEdge.left <= start.left)
+        assertTrue(enlargedBeyondRightEdge.top <= start.top)
+        assertTrue(enlargedBeyondRightEdge.left >= safePortrait.left)
+        assertTrue(enlargedBeyondRightEdge.top >= safePortrait.top + topDragReserve)
+        assertTrue(enlargedBeyondRightEdge.right <= safePortrait.right)
+        assertTrue(enlargedBeyondRightEdge.bottom <= safePortrait.bottom)
 
         val shrunkToMin = resizeMirrorWindowFromCorner(
             start = start,
@@ -99,6 +117,60 @@ class MirrorWindowLayoutTest {
         )
         assertTrue(shrunkToMin.width >= minShortSide - 1)
         assertEquals(expectedAspect, shrunkToMin.width.toFloat() / shrunkToMin.height.toFloat(), 0.015f)
+    }
+
+    @Test
+    fun cornerResizeEnlargesToFullAvailableScreenEvenFromBottomRightEdge() {
+        val start = computeMirrorWindowRect(
+            safe = safePortrait,
+            videoWidth = 1080,
+            videoHeight = 2400,
+            topDragReservePx = topDragReserve,
+            sideBarFootprintPx = sideBarFootprint,
+            minShortSidePx = minShortSide,
+        )
+        val atCorner = dragMirrorWindow(start, 10_000f, 10_000f, safePortrait, topDragReserve)
+        val enlarged = resizeMirrorWindowFromCorner(
+            start = atCorner,
+            totalDeltaX = 5000f,
+            totalDeltaY = 5000f,
+            safe = safePortrait,
+            videoWidth = 1080,
+            videoHeight = 2400,
+            topDragReservePx = topDragReserve,
+            minShortSidePx = minShortSide,
+        )
+        val availH = safePortrait.height - topDragReserve
+        assertTrue("Expected near-full height $availH, got ${enlarged.height}", enlarged.height >= availH - 2)
+        assertEquals(1080f / 2400f, enlarged.width.toFloat() / enlarged.height.toFloat(), 0.01f)
+        assertTrue(enlarged.left >= safePortrait.left)
+        assertTrue(enlarged.top >= safePortrait.top + topDragReserve)
+        assertTrue(enlarged.right <= safePortrait.right)
+        assertTrue(enlarged.bottom <= safePortrait.bottom)
+    }
+
+    @Test
+    fun snappedWindowSizesProduceNoInnerLetterboxBars() {
+        val start = computeMirrorWindowRect(
+            safe = safePortrait,
+            videoWidth = 1080,
+            videoHeight = 2400,
+            topDragReservePx = topDragReserve,
+            sideBarFootprintPx = sideBarFootprint,
+            minShortSidePx = minShortSide,
+        )
+        val candidates = listOf(
+            start,
+            resizeMirrorWindowFromCorner(start, 5000f, 5000f, safePortrait, 1080, 2400, topDragReserve, minShortSide),
+            resizeMirrorWindowFromCorner(start, -5000f, -5000f, safePortrait, 1080, 2400, topDragReserve, minShortSide),
+            computeMirrorWindowRect(safeLandscape, 1080, 2400, topDragReserve, sideBarFootprint, minShortSide),
+        )
+        for (rect in candidates) {
+            val layout = VideoLayout.fitCentered(rect.width, rect.height, 1080, 2400)
+            assertTrue(layout.isValid)
+            assertTrue("Left bar ${layout.contentLeft} too large for $rect", layout.contentLeft <= 1f)
+            assertTrue("Top bar ${layout.contentTop} too large for $rect", layout.contentTop <= 1f)
+        }
     }
 
     @Test

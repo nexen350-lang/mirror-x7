@@ -4,6 +4,7 @@ import android.app.Application
 import android.net.Uri
 import android.util.Log
 import android.view.SurfaceView
+import android.view.TextureView
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
@@ -70,15 +71,32 @@ class ScreenshotViewModel(application: Application, private val saved: SavedStat
     }
 
     fun capture(surface: SurfaceView?) {
-        if (_state.value.busy) return
         if (surface == null) {
-            _state.value = ScreenshotState(notice = getApplication<Application>().getString(R.string.screenshot_error_not_ready))
+            reportNotReady()
             return
         }
+        launchCapture { exporter.capture(surface) }
+    }
+
+    fun captureTexture(texture: TextureView?) {
+        if (texture == null) {
+            reportNotReady()
+            return
+        }
+        launchCapture { exporter.capture(texture) }
+    }
+
+    private fun reportNotReady() {
+        if (_state.value.busy) return
+        _state.value = ScreenshotState(notice = getApplication<Application>().getString(R.string.screenshot_error_not_ready))
+    }
+
+    private fun launchCapture(block: suspend () -> PendingScreenshot) {
+        if (_state.value.busy) return
         _state.value = ScreenshotState(busy = true)
         viewModelScope.launch {
             try {
-                val image = exporter.capture(surface)
+                val image = block()
                 pending = image
                 saved[KEY_TOKEN] = image.token
                 saved[KEY_PICKER] = false
@@ -112,16 +130,27 @@ class ScreenshotViewModel(application: Application, private val saved: SavedStat
      * already handled or it would be saved and shared at the same time.
      */
     fun shareCapture(surface: SurfaceView?) {
-        if (_state.value.busy) return
         if (surface == null) {
-            _state.value = ScreenshotState(notice = getApplication<Application>()
-                .getString(R.string.screenshot_error_not_ready))
+            reportNotReady()
             return
         }
+        launchShareCapture { exporter.capture(surface) }
+    }
+
+    fun shareCaptureTexture(texture: TextureView?) {
+        if (texture == null) {
+            reportNotReady()
+            return
+        }
+        launchShareCapture { exporter.capture(texture) }
+    }
+
+    private fun launchShareCapture(block: suspend () -> PendingScreenshot) {
+        if (_state.value.busy) return
         _state.value = ScreenshotState(busy = true)
         viewModelScope.launch {
             try {
-                val image = exporter.capture(surface)
+                val image = block()
                 val file = exporter.stagedFile(image)
                 if (file == null) {
                     discardAfterClear(image)

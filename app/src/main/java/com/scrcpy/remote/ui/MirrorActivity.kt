@@ -15,6 +15,7 @@ import android.os.Build
 import android.net.Uri
 import android.os.Bundle
 import android.os.PowerManager
+import android.provider.Settings
 import android.util.Log
 import android.util.Rational
 import android.view.InputDevice
@@ -154,6 +155,20 @@ class MirrorActivity : ComponentActivity() {
     private var pipReturnRequested = false
     private var pipReturnWatchdog: Job? = null
     private var pipDialogOpen = false
+    private var activityStarted by mutableStateOf(false)
+    private var overlayActive by mutableStateOf(false)
+    private var overlayDisabledForSession by mutableStateOf(false)
+    private var pendingOverlayPermissionLaunch by mutableStateOf(false)
+    private var showOverlayPermissionDialog by mutableStateOf(false)
+    private var overlayDialogRequest by mutableStateOf<OverlayDialogRequest?>(null)
+    private var overlayTemporaryPortraitCalibration by mutableStateOf<TouchCalibration?>(null)
+    private var overlayTemporaryLandscapeCalibration by mutableStateOf<TouchCalibration?>(null)
+    private var overlayController: MirrorOverlayController? = null
+    private var savedDeviceIdForOverlay: String? = null
+    private var windowDeviceKeyForOverlay: String = ""
+    private var linkRequestForOverlay: LinkRequest = LinkRequest()
+    private var deviceLabelForOverlay: String? = null
+    private var overlayMoveToBackgroundOnAttach = false
     private val hideSessionTools: Boolean get() = pipMode || pipEntryRequested
     private val supportsCameraPip by lazy {
         packageManager.hasSystemFeature(PackageManager.FEATURE_PICTURE_IN_PICTURE)
@@ -178,6 +193,7 @@ class MirrorActivity : ComponentActivity() {
      * left the chosen document empty or partial. The screen stays until that work has settled.
      */
     private fun leaveSession() {
+        deactivateOverlay()
         viewModel.disconnect()
         if (artefactWorkPending()) exitAfterRecording = true else finish()
     }
@@ -411,6 +427,11 @@ class MirrorActivity : ComponentActivity() {
     private val shareArtefact = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
         shareChooserOpen = false
     }
+    private val requestOverlayPermission =
+        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
+            pendingOverlayPermissionLaunch = false
+            reconcileOverlayMode()
+        }
     private var notificationsRequested = false
 
     private fun ensureNotificationPermission() {
@@ -433,6 +454,9 @@ class MirrorActivity : ComponentActivity() {
      */
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
+        if (intent.action == ACTION_BRING_TO_FRONT) {
+            return
+        }
         if (intent.action == ACTION_RETURN_FROM_PIP) {
             if (pipCloseArmed || isInPictureInPictureMode) watchCameraPipReturn()
             return
@@ -455,6 +479,7 @@ class MirrorActivity : ComponentActivity() {
         if (current == null || !sameEndpoint(current.host, current.port, next.host, next.port)) {
             viewModel.setInputLocked(false)
         }
+        overlayDisabledForSession = false
         exitAfterRecording = false
         setIntent(intent)
         val sessionState = viewModel.state.value
@@ -553,6 +578,12 @@ class MirrorActivity : ComponentActivity() {
         // Started while the Activity is in the foreground: Android 12 and newer reject a
         // foreground-service start once the process has already been backgrounded.
         val deviceLabel = repository.getDevices().firstOrNull { it.id == savedDeviceId }?.name
+        val uiTarget = requireNotNull(MirrorTarget.from(intent))
+        val targetDeviceKey = mirrorWindowDeviceKey(uiTarget.deviceId, uiTarget.host, uiTarget.port)
+        savedDeviceIdForOverlay = savedDeviceId
+        windowDeviceKeyForOverlay = targetDeviceKey
+        linkRequestForOverlay = linkRequest
+        deviceLabelForOverlay = deviceLabel
         // One derived reason drives the service, so the two things that need the process alive —
         // a live session and a pending transfer — can never tear down each other's hold.
         lifecycleScope.launch {
@@ -566,6 +597,11 @@ class MirrorActivity : ComponentActivity() {
                     // in both would say it twice, and reporting only here said it only for audio.
                     MirrorSessionService.start(this@MirrorActivity, deviceLabel, hold)
                 }
+            }
+        }
+        lifecycleScope.launch {
+            combine(viewModel.state, viewModel.activeSettings) { st, active -> st to active }.collect {
+                reconcileOverlayMode()
             }
         }
         lifecycleScope.launch {
@@ -595,7 +631,6 @@ class MirrorActivity : ComponentActivity() {
             }
         }
 
-        val uiTarget = requireNotNull(MirrorTarget.from(intent))
         setContent {
             ScrcpyRemoteTheme(darkTheme = true) {
                 TargetScopedMirrorUi(uiTarget) {
@@ -603,7 +638,7 @@ class MirrorActivity : ComponentActivity() {
                         viewModel = viewModel,
                         repository = repository,
                         savedDeviceId = savedDeviceId,
-                        windowDeviceKey = mirrorWindowDeviceKey(uiTarget.deviceId, uiTarget.host, uiTarget.port),
+                        windowDeviceKey = targetDeviceKey,
                         screenshots = screenshots,
                         linkRequest = linkRequest,
                         pipMode = pipMode,
@@ -618,10 +653,22 @@ class MirrorActivity : ComponentActivity() {
                         onPipStateChanged = ::reconcileCameraPip,
                         onShareArtefact = ::launchArtefactShare,
                         onRequestScreenshot = {
-                            if (canUseSessionTools()) screenshots.capture(screenshotSurface)
+                            if (canUseSessionTools()) {
+                                if (overlayActive) {
+                                    screenshots.captureTexture(overlayController?.activeTextureView)
+                                } else {
+                                    screenshots.capture(screenshotSurface)
+                                }
+                            }
                         },
                         onRequestShareScreenshot = {
-                            if (canUseSessionTools()) screenshots.shareCapture(screenshotSurface)
+                            if (canUseSessionTools()) {
+                                if (overlayActive) {
+                                    screenshots.shareCaptureTexture(overlayController?.activeTextureView)
+                                } else {
+                                    screenshots.shareCapture(screenshotSurface)
+                                }
+                            }
                         },
                         onSaveRecording = { name ->
                             if (canUseSessionTools()) {
@@ -644,6 +691,30 @@ class MirrorActivity : ComponentActivity() {
                         onLocalTypingChanged = {
                             typingLocally = it
                             viewModel.onLocalTypingChanged(it)
+                        },
+                        overlayActive = overlayActive,
+                        showOverlayPermissionDialog = showOverlayPermissionDialog,
+                        onAllowOverlayPermission = ::launchOverlayPermissionSettings,
+                        onDeclineOverlayPermission = {
+                            MirrorWindowPreferences.markOverlayPermissionPrompted(this@MirrorActivity)
+                            showOverlayPermissionDialog = false
+                            overlayDisabledForSession = true
+                        },
+                        onMinimizeToOverlay = {
+                            if (overlayActive) moveTaskToBack(true)
+                        },
+                        onSwitchToInApp = {
+                            overlayDisabledForSession = true
+                            deactivateOverlay()
+                        },
+                        overlayDialogRequest = overlayDialogRequest,
+                        onOverlayDialogConsumed = { overlayDialogRequest = null },
+                        externalTemporaryCalibration = { land ->
+                            if (land) overlayTemporaryLandscapeCalibration else overlayTemporaryPortraitCalibration
+                        },
+                        onExternalTemporaryCalibrationChange = { land, value ->
+                            if (land) overlayTemporaryLandscapeCalibration = value
+                            else overlayTemporaryPortraitCalibration = value
                         },
                         onDisconnect = ::leaveSession,
                     )
@@ -724,15 +795,144 @@ class MirrorActivity : ComponentActivity() {
         return viewModel.sendKeyEvent(action, keyCode, event.repeatCount, event.metaState)
     }
 
+    private fun updateViewModelVisibility() {
+        viewModel.onVisibilityChanged(activityStarted || overlayActive)
+    }
+
+    private fun reconcileOverlayMode() {
+        val connected = viewModel.state.value as? MirrorUiState.Connected
+        val isScreenSession = connected != null && viewModel.activeSettings.value?.camera == null
+        if (!isScreenSession || hideSessionTools || isInPictureInPictureMode || overlayDisabledForSession) {
+            showOverlayPermissionDialog = false
+            deactivateOverlay()
+            return
+        }
+        if (Settings.canDrawOverlays(this)) {
+            showOverlayPermissionDialog = false
+            if (!overlayActive) {
+                activateOverlay(moveAppToBackground = resumed && !pendingOverlayPermissionLaunch)
+            }
+        } else {
+            if (overlayActive) {
+                deactivateOverlay()
+            }
+            if (!MirrorWindowPreferences.hasPromptedOverlayPermission(this) &&
+                !pendingOverlayPermissionLaunch && resumed
+            ) {
+                showOverlayPermissionDialog = true
+            }
+        }
+    }
+
+    private fun launchOverlayPermissionSettings() {
+        MirrorWindowPreferences.markOverlayPermissionPrompted(this)
+        showOverlayPermissionDialog = false
+        pendingOverlayPermissionLaunch = true
+        val permissionIntent = Intent(
+            Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+            Uri.parse("package:$packageName"),
+        )
+        try {
+            requestOverlayPermission.launch(permissionIntent)
+        } catch (_: ActivityNotFoundException) {
+            pendingOverlayPermissionLaunch = false
+            viewModel.showNotice(getString(R.string.overlay_permission_unavailable))
+        }
+    }
+
+    private fun activateOverlay(moveAppToBackground: Boolean) {
+        if (overlayActive) return
+        val controller = overlayController ?: MirrorOverlayController(
+            context = applicationContext,
+            viewModel = viewModel,
+            repository = DeviceRepository.get(this),
+            savedDeviceId = savedDeviceIdForOverlay,
+            windowDeviceKey = windowDeviceKeyForOverlay,
+            linkRequest = linkRequestForOverlay,
+            screenshots = screenshots,
+            onAttached = {
+                if (overlayMoveToBackgroundOnAttach && resumed && overlayActive && overlayDialogRequest == null) {
+                    overlayMoveToBackgroundOnAttach = false
+                    moveTaskToBack(true)
+                }
+            },
+            onExitRequested = {
+                overlayDisabledForSession = true
+                deactivateOverlay()
+                leaveSession()
+            },
+            onDialogRequested = ::bringActivityToFrontForDialog,
+            onUpdateTemporaryCalibration = { land, value ->
+                if (land) overlayTemporaryLandscapeCalibration = value
+                else overlayTemporaryPortraitCalibration = value
+            },
+            temporaryCalibrationProvider = { land ->
+                if (land) overlayTemporaryLandscapeCalibration else overlayTemporaryPortraitCalibration
+            },
+            onOverlayUnavailable = {
+                runOnUiThread {
+                    deactivateOverlay()
+                }
+            },
+        ).also { overlayController = it }
+
+        val hold = viewModel.sessionHold.value.takeIf { it != SessionHold.NONE } ?: SessionHold.CONNECTED
+        MirrorSessionService.start(this, deviceLabelForOverlay, hold)
+        overlayMoveToBackgroundOnAttach = moveAppToBackground
+        overlayActive = true
+        updateViewModelVisibility()
+        if (MirrorSessionService.setOverlayController(controller) &&
+            overlayMoveToBackgroundOnAttach && resumed && overlayDialogRequest == null
+        ) {
+            overlayMoveToBackgroundOnAttach = false
+            moveTaskToBack(true)
+        }
+    }
+
+    private fun deactivateOverlay() {
+        val wasActive = overlayActive
+        overlayMoveToBackgroundOnAttach = false
+        overlayController?.releaseActiveSurfaceOwnership()
+        MirrorSessionService.setOverlayController(null)
+        overlayController = null
+        overlayActive = false
+        if (wasActive) {
+            updateViewModelVisibility()
+        }
+    }
+
+    private fun bringActivityToFrontForDialog(request: OverlayDialogRequest) {
+        if (request == OverlayDialogRequest.SCREENSHOT) {
+            screenshots.captureTexture(overlayController?.activeTextureView)
+        } else if (request == OverlayDialogRequest.SHARE_SCREENSHOT) {
+            screenshots.shareCaptureTexture(overlayController?.activeTextureView)
+        } else {
+            overlayDialogRequest = request
+        }
+        val target = MirrorTarget.from(intent) ?: return
+        val bringIntent = newIntent(
+            context = this,
+            host = target.host,
+            port = target.port,
+            deviceId = target.deviceId,
+            linkOptions = target.linkOptions,
+        )
+            .setAction(ACTION_BRING_TO_FRONT)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT)
+        startActivity(bringIntent)
+    }
+
     override fun onStart() {
         super.onStart()
-        viewModel.onVisibilityChanged(true)
+        activityStarted = true
+        updateViewModelVisibility()
     }
 
     override fun onResume() {
         super.onResume()
         resumed = true
         if (!isInPictureInPictureMode) restoreFullscreenTools()
+        reconcileOverlayMode()
     }
 
     override fun onPause() {
@@ -744,7 +944,8 @@ class MirrorActivity : ComponentActivity() {
 
     override fun onStop() {
         super.onStop()
-        viewModel.onVisibilityChanged(false)
+        activityStarted = false
+        updateViewModelVisibility()
         if (pipCloseArmed && !isChangingConfigurations) {
             if (pipReturnWatchdog?.isActive == true && !isFinishing) {
                 // A task return can temporarily stop the pinned Activity. Its watchdog still
@@ -795,6 +996,7 @@ class MirrorActivity : ComponentActivity() {
     override fun onDestroy() {
         super.onDestroy()
         if (isFinishing) {
+            deactivateOverlay()
             viewModel.disconnect()
             MirrorSessionService.stop(this)
         }
@@ -808,6 +1010,7 @@ class MirrorActivity : ComponentActivity() {
         private val APP_PICKER_TYPES = arrayOf(ApkInstall.MIME_TYPE, "application/octet-stream", "application/zip",
             "application/x-zip-compressed", "application/vnd.apks", "application/vnd.apkm", "application/xapk-package-archive")
         private const val PIP_TAG = "CameraPiP"
+        private const val ACTION_BRING_TO_FRONT = "com.scrcpy.remote.BRING_MIRROR_TO_FRONT"
         private const val ACTION_RETURN_FROM_PIP = "com.scrcpy.remote.RETURN_FROM_CAMERA_PIP"
         private const val PIP_RETURN_TIMEOUT_MS = 5_000L
         private const val STATE_EXIT_AFTER_RECORDING = "mirror.exitAfterRecording"
@@ -893,6 +1096,16 @@ private fun MirrorScreen(
     onPickAppToInstall: () -> Unit,
     onSurfaceBound: (SurfaceView, Boolean) -> Unit,
     onLocalTypingChanged: (Boolean) -> Unit,
+    overlayActive: Boolean = false,
+    showOverlayPermissionDialog: Boolean = false,
+    onAllowOverlayPermission: () -> Unit = {},
+    onDeclineOverlayPermission: () -> Unit = {},
+    onMinimizeToOverlay: () -> Unit = {},
+    onSwitchToInApp: () -> Unit = {},
+    overlayDialogRequest: OverlayDialogRequest? = null,
+    onOverlayDialogConsumed: () -> Unit = {},
+    externalTemporaryCalibration: (Boolean) -> TouchCalibration? = { null },
+    onExternalTemporaryCalibrationChange: (Boolean, TouchCalibration?) -> Unit = { _, _ -> },
     onDisconnect: () -> Unit,
 ) {
     val state by viewModel.state.collectAsState()
@@ -1008,8 +1221,9 @@ private fun MirrorScreen(
     var temporaryPortraitY by rememberSaveable { mutableStateOf<Int?>(null) }
     var temporaryLandscapeX by rememberSaveable { mutableStateOf<Int?>(null) }
     var temporaryLandscapeY by rememberSaveable { mutableStateOf<Int?>(null) }
-    val temporary = if (landscape) temporaryLandscapeX?.let { TouchCalibration(it, temporaryLandscapeY ?: 0) }
-        else temporaryPortraitX?.let { TouchCalibration(it, temporaryPortraitY ?: 0) }
+    val temporary = (if (landscape) temporaryLandscapeX?.let { TouchCalibration(it, temporaryLandscapeY ?: 0) }
+        else temporaryPortraitX?.let { TouchCalibration(it, temporaryPortraitY ?: 0) })
+        ?: externalTemporaryCalibration(landscape)
     val persistedCalibration = if (savedDevice != null) {
         if (landscape) savedDevice.landscapeCalibration else savedDevice.portraitCalibration
     } else temporary
@@ -1087,12 +1301,38 @@ private fun MirrorScreen(
                 }
             }
         }
-        else if (landscape) {
-            temporaryLandscapeX = value?.xDp
-            temporaryLandscapeY = value?.yDp
-        } else {
-            temporaryPortraitX = value?.xDp
-            temporaryPortraitY = value?.yDp
+        else {
+            onExternalTemporaryCalibrationChange(landscape, value)
+            if (landscape) {
+                temporaryLandscapeX = value?.xDp
+                temporaryLandscapeY = value?.yDp
+            } else {
+                temporaryPortraitX = value?.xDp
+                temporaryPortraitY = value?.yDp
+            }
+        }
+    }
+
+    LaunchedEffect(overlayDialogRequest, fullscreenToolsAvailable) {
+        val request = overlayDialogRequest ?: return@LaunchedEffect
+        if (!canUseSessionTools()) return@LaunchedEffect
+        onOverlayDialogConsumed()
+        when (request) {
+            OverlayDialogRequest.APPS -> showApps = true
+            OverlayDialogRequest.ENCODERS -> showEncoders = true
+            OverlayDialogRequest.DISPLAYS -> showDisplays = true
+            OverlayDialogRequest.CAMERAS -> showCameras = true
+            OverlayDialogRequest.DEVICE_SETTINGS -> if (savedDevice != null) showDeviceSettings = true
+            OverlayDialogRequest.DETAILS -> showDetails = true
+            OverlayDialogRequest.STREAM_CHOICES -> showStreamChoices = true
+            OverlayDialogRequest.APPLY_SETTINGS -> confirmApplySettings = true
+            OverlayDialogRequest.SEND_FILE -> onPickFileToSend()
+            OverlayDialogRequest.RECORD_SOUND_CHOICE -> {
+                val sound = viewModel.recordingSound()
+                if (sound is RecordingSound.NeedsAac) soundChoice = sound.codec
+            }
+            OverlayDialogRequest.FINISHED_RECORDING -> Unit
+            OverlayDialogRequest.SCREENSHOT, OverlayDialogRequest.SHARE_SCREENSHOT -> Unit
         }
     }
 
@@ -1189,6 +1429,12 @@ private fun MirrorScreen(
 
             is MirrorUiState.Connected -> if (hideSessionTools && activeSettings?.camera == null) {
                 CameraPipStatus(R.string.camera_pip_failed)
+            } else if (overlayActive) {
+                OverlayRunningStatus(
+                    onMinimizeToOverlay = onMinimizeToOverlay,
+                    onSwitchToInApp = onSwitchToInApp,
+                    onDisconnect = { confirmLeave = true },
+                )
             } else {
                 val windowCornerRadiusPx = if (activeWindowRect != null) {
                     val minSide = minOf(activeWindowRect.width, activeWindowRect.height).toFloat()
@@ -1317,7 +1563,7 @@ private fun MirrorScreen(
             }
         }
 
-        if (connected != null && !hideSessionTools) {
+        if (connected != null && !hideSessionTools && !overlayActive) {
             MirrorStatsChip(viewModel)
             if (showDiagnostics) {
                 MirrorDiagnostics(
@@ -1845,6 +2091,62 @@ private fun MirrorScreen(
             },
         )
     }
+    if (showOverlayPermissionDialog) {
+        AlertDialog(
+            onDismissRequest = onDeclineOverlayPermission,
+            title = { Text(stringResource(R.string.overlay_permission_title)) },
+            text = { Text(stringResource(R.string.overlay_permission_body)) },
+            confirmButton = {
+                Button(onClick = onAllowOverlayPermission) {
+                    Text(stringResource(R.string.overlay_permission_allow))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = onDeclineOverlayPermission) {
+                    Text(stringResource(R.string.overlay_permission_fallback))
+                }
+            },
+        )
+    }
+}
+
+@Composable
+private fun OverlayRunningStatus(
+    onMinimizeToOverlay: () -> Unit,
+    onSwitchToInApp: () -> Unit,
+    onDisconnect: () -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .background(MaterialTheme.colorScheme.surface)
+            .padding(24.dp)
+            .testTag("overlay-running-status"),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Text(
+            stringResource(R.string.overlay_active_title),
+            color = MaterialTheme.colorScheme.onSurface,
+            style = MaterialTheme.typography.titleMedium,
+            textAlign = TextAlign.Center,
+        )
+        Text(
+            stringResource(R.string.overlay_active_body),
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            style = MaterialTheme.typography.bodyMedium,
+            textAlign = TextAlign.Center,
+        )
+        Spacer(Modifier.height(4.dp))
+        Button(onClick = onMinimizeToOverlay) {
+            Text(stringResource(R.string.overlay_hide_app))
+        }
+        TextButton(onClick = onSwitchToInApp) {
+            Text(stringResource(R.string.overlay_switch_in_app))
+        }
+        TextButton(onClick = onDisconnect) {
+            Text(stringResource(R.string.exit))
+        }
+    }
 }
 
 @Composable
@@ -1917,7 +2219,7 @@ private fun defaultRecordingName(): String = java.text.SimpleDateFormat(
     "yyyyMMdd-HHmmss", java.util.Locale.US).format(java.util.Date()).let { "scrcpy-recording-$it.mp4" }
 
 @Composable
-private fun rememberMirrorActions(    viewModel: MirrorViewModel,
+internal fun rememberMirrorActions(    viewModel: MirrorViewModel,
     settings: MirrorSettings,
     deviceScreenOff: Boolean,
     onOpenApps: () -> Unit,

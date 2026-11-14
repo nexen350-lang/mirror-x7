@@ -8,6 +8,7 @@ import android.os.Handler
 import android.os.Looper
 import android.view.PixelCopy
 import android.view.SurfaceView
+import android.view.TextureView
 import com.scrcpy.remote.R
 import java.io.File
 import java.io.IOException
@@ -94,6 +95,55 @@ class ScreenshotExporter(context: Context, cacheRoot: File = context.application
             throw error(R.string.screenshot_error_memory, cause).also { failure = it }
         } finally {
             lifecycle?.release()
+            if (!delivered) pending?.let { cleanup(it, failure) }
+        }
+    }
+
+    /** Capture directly from the overlay TextureView bitmap when mirroring in floating window mode. */
+    suspend fun capture(view: TextureView): PendingScreenshot {
+        var bitmap: Bitmap? = null
+        var pending: PendingScreenshot? = null
+        var delivered = false
+        var failure: Throwable? = null
+        try {
+            withContext(Dispatchers.Main.immediate) {
+                if (!view.isAttachedToWindow || !view.isAvailable || view.width <= 0 || view.height <= 0) {
+                    throw error(R.string.screenshot_error_not_ready)
+                }
+                val size = boundedScreenshotSize(view.width, view.height)
+                bitmap = try {
+                    view.getBitmap(size.width, size.height)
+                } catch (cause: OutOfMemoryError) {
+                    throw error(R.string.screenshot_error_memory, cause)
+                } ?: throw error(R.string.screenshot_error_not_ready)
+            }
+            withContext(Dispatchers.IO) {
+                val coroutineContext = currentCoroutineContext()
+                coroutineContext.ensureActive()
+                pending = cache.create { output ->
+                    if (!requireNotNull(bitmap).compress(Bitmap.CompressFormat.PNG, 100, output)) {
+                        throw IOException("PNG encoder failed")
+                    }
+                    coroutineContext.ensureActive()
+                }
+            }
+            currentCoroutineContext().ensureActive()
+            delivered = true
+            return requireNotNull(pending)
+        } catch (cause: CancellationException) {
+            failure = cause
+            throw cause
+        } catch (cause: ScreenshotException) {
+            failure = cause
+            throw cause
+        } catch (cause: IOException) {
+            throw error(R.string.screenshot_error_prepare, cause).also { failure = it }
+        } catch (cause: SecurityException) {
+            throw error(R.string.screenshot_error_prepare, cause).also { failure = it }
+        } catch (cause: OutOfMemoryError) {
+            throw error(R.string.screenshot_error_memory, cause).also { failure = it }
+        } finally {
+            bitmap?.recycle()
             if (!delivered) pending?.let { cleanup(it, failure) }
         }
     }

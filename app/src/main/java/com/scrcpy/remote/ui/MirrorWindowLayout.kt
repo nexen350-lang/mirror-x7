@@ -71,6 +71,29 @@ private fun minWindowWidth(
     return desiredMinW.coerceAtMost(maxW).coerceAtLeast(1f)
 }
 
+private fun snapWindowDimensions(
+    desiredW: Float,
+    safe: ControlBounds,
+    videoWidth: Int,
+    videoHeight: Int,
+    topDragReservePx: Int,
+    minShortSidePx: Int,
+): Pair<Int, Int> {
+    val aspect = safeAspect(videoWidth, videoHeight)
+    val (maxW, _) = maxWindowDimensions(safe, aspect, topDragReservePx)
+    val minW = minWindowWidth(maxW, aspect, minShortSidePx)
+    val maxAvailW = safe.width.coerceAtLeast(1)
+    val maxAvailH = (safe.height - topDragReservePx).coerceAtLeast(1)
+    val targetW = desiredW.coerceIn(minW, maxW)
+    val targetH = targetW / aspect
+    val vw = if (videoWidth > 0 && videoHeight > 0) videoWidth else 9
+    val vh = if (videoWidth > 0 && videoHeight > 0) videoHeight else 16
+    val scale = min(targetW.coerceAtMost(maxAvailW.toFloat()) / vw, targetH.coerceAtMost(maxAvailH.toFloat()) / vh)
+    val widthPx = (vw * scale).roundToInt().coerceIn(1, maxAvailW)
+    val heightPx = (vh * scale).roundToInt().coerceIn(1, maxAvailH)
+    return widthPx to heightPx
+}
+
 /**
  * Computes the mirror window's pixel rectangle inside [safe] while preserving the remote video's
  * aspect ratio. When [saved] is null, centers the window at a comfortable phone-mirroring size
@@ -98,10 +121,16 @@ internal fun computeMirrorWindowRect(
     if (saved != null && saved.sizeFraction.isFinite() &&
         saved.xFraction.isFinite() && saved.yFraction.isFinite()
     ) {
-        val targetW = (saved.sizeFraction * maxW).coerceIn(minW, maxW)
-        widthPx = targetW.roundToInt().coerceIn(1, safe.width.coerceAtLeast(1))
-        heightPx = (widthPx / aspect).roundToInt()
-            .coerceIn(1, (safe.bottom - minTop).coerceAtLeast(1))
+        val snapped = snapWindowDimensions(
+            desiredW = saved.sizeFraction * maxW,
+            safe = safe,
+            videoWidth = videoWidth,
+            videoHeight = videoHeight,
+            topDragReservePx = topDragReservePx,
+            minShortSidePx = minShortSidePx,
+        )
+        widthPx = snapped.first
+        heightPx = snapped.second
 
         val maxLeft = max(safe.left, safe.right - widthPx)
         val maxTop = max(minTop, safe.bottom - heightPx)
@@ -125,11 +154,18 @@ internal fun computeMirrorWindowRect(
             targetMaxH * aspect
         } else {
             targetMaxW
-        }.coerceIn(minW, maxW)
+        }
 
-        widthPx = defaultW.roundToInt().coerceIn(1, safe.width.coerceAtLeast(1))
-        heightPx = (widthPx / aspect).roundToInt()
-            .coerceIn(1, (safe.bottom - minTop).coerceAtLeast(1))
+        val snapped = snapWindowDimensions(
+            desiredW = defaultW,
+            safe = safe,
+            videoWidth = videoWidth,
+            videoHeight = videoHeight,
+            topDragReservePx = topDragReservePx,
+            minShortSidePx = minShortSidePx,
+        )
+        widthPx = snapped.first
+        heightPx = snapped.second
 
         val maxLeft = max(safe.left, safe.right - widthPx)
         val maxTop = max(minTop, safe.bottom - heightPx)
@@ -164,7 +200,8 @@ internal fun dragMirrorWindow(
 
 /**
  * Resizes from the bottom-right corner relative to [start] while keeping the top-left corner fixed
- * and strictly preserving the remote video's aspect ratio.
+ * until the frame reaches the screen edge, then shifting left/up as needed so enlargement can reach
+ * the full available screen size while strictly preserving the remote video's aspect ratio.
  */
 internal fun resizeMirrorWindowFromCorner(
     start: MirrorWindowRect,
@@ -180,11 +217,6 @@ internal fun resizeMirrorWindowFromCorner(
     val (globalMaxW, _) = maxWindowDimensions(safe, aspect, topDragReservePx)
     val minW = minWindowWidth(globalMaxW, aspect, minShortSidePx)
 
-    val anchorMaxW = (safe.right - start.left).coerceAtLeast(1).toFloat()
-    val anchorMaxH = (safe.bottom - start.top).coerceAtLeast(1).toFloat()
-    val maxWFromAnchor = min(globalMaxW, min(anchorMaxW, anchorMaxH * aspect))
-    val effectiveMinW = min(minW, maxWFromAnchor).coerceAtLeast(1f)
-
     val relX = abs(totalDeltaX) / start.width.coerceAtLeast(1)
     val relY = abs(totalDeltaY) / start.height.coerceAtLeast(1)
     val candidateW = if (relX >= relY) {
@@ -192,11 +224,20 @@ internal fun resizeMirrorWindowFromCorner(
     } else {
         (start.height + totalDeltaY) * aspect
     }
-    val clampedW = candidateW.coerceIn(effectiveMinW, maxWFromAnchor)
-    val widthPx = clampedW.roundToInt().coerceIn(1, (safe.right - start.left).coerceAtLeast(1))
-    val heightPx = (widthPx / aspect).roundToInt()
-        .coerceIn(1, (safe.bottom - start.top).coerceAtLeast(1))
-    return MirrorWindowRect(start.left, start.top, widthPx, heightPx)
+    val (widthPx, heightPx) = snapWindowDimensions(
+        desiredW = candidateW.coerceIn(minW, globalMaxW),
+        safe = safe,
+        videoWidth = videoWidth,
+        videoHeight = videoHeight,
+        topDragReservePx = topDragReservePx,
+        minShortSidePx = minShortSidePx,
+    )
+    val minTop = safe.top + topDragReservePx
+    val maxLeft = max(safe.left, safe.right - widthPx)
+    val maxTop = max(minTop, safe.bottom - heightPx)
+    val leftPx = start.left.coerceIn(safe.left, maxLeft)
+    val topPx = start.top.coerceIn(minTop, maxTop)
+    return MirrorWindowRect(leftPx, topPx, widthPx, heightPx)
 }
 
 /** Converts pixel [rect] into normalized [MirrorWindowFractions] for per-device persistence. */
@@ -249,6 +290,16 @@ internal object MirrorWindowPreferences {
     private const val KEY_X = ".x"
     private const val KEY_Y = ".y"
     private const val KEY_SIZE = ".size"
+    private const val KEY_OVERLAY_PROMPTED = "overlay.permission.prompted"
+
+    fun hasPromptedOverlayPermission(context: Context): Boolean =
+        context.getSharedPreferences(FILE, Context.MODE_PRIVATE).getBoolean(KEY_OVERLAY_PROMPTED, false)
+
+    fun markOverlayPermissionPrompted(context: Context) {
+        context.getSharedPreferences(FILE, Context.MODE_PRIVATE).edit {
+            putBoolean(KEY_OVERLAY_PROMPTED, true)
+        }
+    }
 
     fun load(
         context: Context,
