@@ -579,9 +579,9 @@ class ScrcpySession private constructor(
          *
          * [onPush] runs only when a transfer is actually needed.
          */
-        @Throws(IOException::class)
         private val bundledServerCache = ConcurrentHashMap<ScrcpyServerVersion, ByteArray>()
 
+        @Throws(IOException::class)
         private fun loadVerifiedServerBytes(context: Context, server: ScrcpyServerVersion): ByteArray =
             bundledServerCache[server] ?: context.assets.open(server.assetName).use { it.readBytes() }.also { bytes ->
                 val digest = MessageDigest.getInstance("SHA-256").digest(bytes)
@@ -600,8 +600,9 @@ class ScrcpySession private constructor(
         }
 
         private val SAFE_REMOTE_PATH = Regex("[A-Za-z0-9._/-]+")
-        private val SHA256_OUTPUT_REGEX = Regex("^([0-9a-fA-F]{64})\s+(.*)$")
+        private val SHA256_OUTPUT_REGEX = Regex("^([0-9a-fA-F]{64})\\s+(.*)$")
 
+        @Throws(IOException::class)
         private fun deployServer(
             context: Context,
             server: ScrcpyServerVersion,

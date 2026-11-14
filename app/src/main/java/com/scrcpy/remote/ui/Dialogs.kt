@@ -1279,7 +1279,7 @@ internal fun QuickConnectDialog(
                 )
                 OutlinedTextField(
                     value = portText,
-                    onValueChange = { portText = asciiDigitsOnly(it, max = 65535) },
+                    onValueChange = { portText = asciiDigitsOnly(it, max = 5) },
                     label = { Text(stringResource(R.string.field_port)) },
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),

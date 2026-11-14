@@ -1,0 +1,115 @@
+libadb-android 3.1.1, local maintenance patch 2026-10-03
+
+Upstream: https://github.com/MuntashirAkon/libadb-android
+Tag: 3.1.1
+Tag archive SHA-256:
+8cdb9b909991ab96da211b293175357345c9d727a22221f36b8d573da7bb1de8
+
+The library's Apache-2.0 alternative is selected, together with the retained
+BSD-3-Clause and MIT terms in individual source headers. See COPYING, LICENSES,
+and upstream-manifest.json for the unmodified import's file digests.
+
+Local changes:
+- AdbConnection.open waits on acknowledged/closed state, not an unconditional
+  notification. This prevents early OKAY/CLSE loss and spurious-wake success.
+  An acknowledged command that has already finished is distinct from an OPEN
+  rejected without acknowledgement, including commands with empty output.
+- Failed/interrupted opens unregister and close their unreturned stream.
+  Late acknowledgements receive a matching CLSE instead of leaking a peer channel.
+- Stream ID allocation is synchronized; acknowledgement wakes all state waiters.
+- AbsAdbConnectionManager snapshots the connection under its lock and opens the
+  stream outside it, so a pending OPEN cannot block physical disconnect.
+- AdbStream exposes an internal acknowledgement-state check.
+- A peer close with unread output drains all queued/buffered bytes and then
+  reaches EOF instead of waiting forever. Writers reject that known peer close
+  even while the reader still owns buffered output.
+- Abrupt transport loss is not reported using the clean peer-EOF exception, so
+  partial shell/catalog output cannot masquerade as a successfully completed read.
+  AdbInputStream delegates closure to that distinction, drains already buffered
+  bytes, returns unsigned single-byte values and accepts zero-length reads without
+  waiting for remote data.
+- v2.4.2: Every outgoing WRTE fragment waits for its own OKAY. Empty and invalid
+  writes do not consume write credit, and concurrent logical writes are serialized
+  with interruptible cancellation.
+- Incoming payload acknowledgement moves to the consumer. One queued packet may
+  wait beside the current read buffer; another uncredited queued packet fails the
+  transport explicitly rather than growing memory without bound. Other channels
+  remain independent. Empty WRTE packets are acknowledged without becoming EOF.
+- Local close immediately unregisters its channel and refuses late input. Read
+  availability retains buffered peer output and distinguishes transport failure
+  from a received clean peer close.
+- v2.5.0: Abrupt stream transport loss uses AdbTransportException so callers can
+  recover without string-matching or treating a truncated read as clean EOF.
+  Connection failure retains its original cause for timeout/TLS diagnostics.
+- v2.5.1: A writer, flush or packet read that reaches an ended transport reports
+  AdbTransportException, and one received CLSE is reported identically to a
+  channel's reader and writer, so recovery no longer depends on which thread
+  noticed the loss first. Using a connection after its reader thread stopped
+  reports transport loss instead of IllegalStateException. The TCP connect is
+  bounded by the manager's existing connection timeout, so an address that never
+  answers cannot hold the manager lock for the kernel's SYN timeout.
+- v2.6.0: An OPEN packet is sized from the destination's UTF-8 bytes rather than
+  its UTF-16 length, so a service name with non-ASCII text (for example a camera
+  named in the device's language) no longer overflows the packet buffer.
+- v2.15.0: A stream keeps output the peer sends before it was acknowledged, up to
+  2 MiB per stream, instead of failing the whole connection on a second queued
+  packet. Android 16's adbd sends a shell command's last output early as the command
+  ends, which ended the mirroring session on the next read. A peer that ignores
+  acknowledgement altogether still fails the transport once that bound is passed.
+  app/src/test/.../adb/AdbFlowControlTest.kt drives a small adbd through such output
+  and past the bound, and AdbStreamOpenTest's queue-bound case now fills 2 MiB first.
+- v2.16.0: Wireless-debugging pairing uses Spake2.java, a Java port of BoringSSL's
+  SPAKE2 (spake25519.cc, Apache-2.0, Copyright 2016 The BoringSSL Authors), instead
+  of the spake2-android 2.2.1 library, which was LGPL-3.0 with a native libspake2.so.
+  Field arithmetic is Bouncy Castle's constant-time X25519Field, and every scalar
+  multiplication is a Montgomery ladder over all 256 bits with the complete Edwards
+  addition law. PairingAuthCtx.java uses it; libadb's build no longer depends on
+  spake2-android. Tests: src/test/java/.../Spake2Test.java (RFC 8032 keys, BoringSSL's
+  M and N, agreement, peers without the 2017 password-scalar fix, corrupted messages);
+  the app's androidTest Spake2InteropTest checks it against the old native library,
+  kept as a test-only dependency; WirelessDebuggingLiveTest pairs with a real adbd.
+- v2.16.0: TLS no longer accepts any certificate. AdbTrustManager.java accepts what
+  adbd always presents, one self-signed certificate for an RSA (2048 bits or more) or
+  EC (256 bits or more) key, and refuses anything else, such as a chain an intercepting
+  proxy's authority issued. adbd's certificate is for a key it creates when it starts,
+  so it cannot be pinned, and AOSP's adb host accepts any server certificate; pairing
+  is authenticated by SPAKE2 over TLS-exported keying material, and the device admits
+  only paired keys. SslUtils.java uses it for pairing and for connecting.
+
+- v3.5.6: The peer's CNXN max-data is clamped to the host's own maximum for the API
+  level (as AOSP's host does) and a value <= 0 fails the connection as a protocol error,
+  so a hostile adbd can no longer force ~2 GiB per-stream/packet allocations or make
+  AdbStream.write spin on empty WRTEs (which also refuses a non-positive chunk size).
+  Test: app/src/test/.../adb/AdbHostileMaxDataTest.kt.
+- v3.5.6: PairingConnectionCtx bounds the TCP connect (10 s) and the TLS handshake and
+  every pairing read (15 s socket timeout), keeps its raw and TLS sockets in fields,
+  closes them when the TLS setup fails and in close(), and close() tolerates a context
+  that never got as far as creating streams or the PAKE state. (No JVM test: it needs a TLS/Conscrypt peer.)
+
+Modified files, each marked with a notice under its license header:
+AbsAdbConnectionManager.java, AdbConnection.java, AdbInputStream.java,
+AdbProtocol.java, AdbStream.java, PairingAuthCtx.java, PairingConnectionCtx.java,
+SslUtils.java and android/AdbMdns.java.
+AdbTransportException.java, AdbTrustManager.java and Spake2.java are new.
+
+The Android build uses the app's existing SDK, Bouncy Castle and toolchain.
+Pairing and authentication, the wire protocol and its cryptography follow upstream
+and AOSP; SPAKE2 is the Java port described above. The old binary artifact is replaced, not packaged alongside
+this module. The existing app deadline and failure paths are retained.
+
+Regression evidence: app/src/androidTest/.../adb/AdbStreamOpenTest.kt runs a
+loopback protocol peer with early replies, spurious wakes, timeout/cancellation,
+late acknowledgements, concurrent opens and physical disconnect. Reflection
+used to control scheduling exists only in the debug instrumentation fixture.
+Additional cases cover packet-by-packet write credit, bounded per-channel receive
+backpressure, empty packets, invalid writes and cancellation without peer replies,
+writers and opens after transport loss, a handshake the peer closes, a connect
+that is never answered, and a non-ASCII OPEN destination. TlsTransportFailureTest
+checks how the bundled Conscrypt provider reports a reset after the TLS handshake.
+- v3.1.1: Once the peer refuses the signature and receives the public key (the
+  device is showing "Allow debugging?"), connect() waits an optional, bounded
+  extra time (setUserAuthorisationTimeout) and reports the moment through
+  setUserAuthorisationListener. Without it a first connection failed after the
+  10-second network timeout while the user was still reaching for the device.
+- v3.4.0: SslUtils, AbsAdbConnectionManager, AdbConnection and AdbMdns no longer use
+  System.out.println/printStackTrace; they log through android.util.Log.w (no stdout/stderr leakage).

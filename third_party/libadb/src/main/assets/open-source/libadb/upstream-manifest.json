@@ -1,0 +1,31 @@
+{
+  "origin": "https://github.com/MuntashirAkon/libadb-android",
+  "tag": "3.1.1",
+  "upstreamArchiveSha256": "8cdb9b909991ab96da211b293175357345c9d727a22221f36b8d573da7bb1de8",
+  "unmodifiedImportedFiles": {
+    "COPYING": "dd5314a7504dc2c80aba35db43a8db2f9362bd5768af07e94539a3e2b6fc3275",
+    "src/main/AndroidManifest.xml": "68bf2d34d04c6fdcd1f7bd8d735cd422e0b41de59b766dff155733e347d0fa2f",
+    "src/main/java/io/github/muntashirakon/adb/AbsAdbConnectionManager.java": "f0c8c79ebe1f20d9486bf206f4db9f98e49b38e1092b020a5687418b6a9071af",
+    "src/main/java/io/github/muntashirakon/adb/AdbAuthenticationFailedException.java": "a78fa66cafa8a76806973b9740dae12d2e5657d36dd15989813bb5dbb6536c5b",
+    "src/main/java/io/github/muntashirakon/adb/AdbConnection.java": "fca1c2a93a044153c9c9ffd0047f8d9d83c8b656f7b88555b5b1758278e64bb1",
+    "src/main/java/io/github/muntashirakon/adb/AdbInputStream.java": "319c4519ef758ad9d774d3d52e30f343c250543fef2d98a1b165f027309af5b9",
+    "src/main/java/io/github/muntashirakon/adb/AdbOutputStream.java": "b593961ee48d13ea35e9fa2b8f854381fe0c4f139b5ce5c6d15cf58e180fdb75",
+    "src/main/java/io/github/muntashirakon/adb/AdbPairingRequiredException.java": "ed5412b1782ebaab9acf36be60b5a7e0c1c4fb4f6dbe6ea21776a1696f5914a5",
+    "src/main/java/io/github/muntashirakon/adb/AdbProtocol.java": "80ca45b44c4bce807f7ef22bd08a5d10a618e9054d7267e37319b7bd151d782b",
+    "src/main/java/io/github/muntashirakon/adb/AdbStream.java": "a13fa4daaf027de2046dffefbf79e092bbc3ac67da7b1e60aeefb75f02b02aa1",
+    "src/main/java/io/github/muntashirakon/adb/AndroidPubkey.java": "9b43262809250d16d4d9188e2160c81908d1b4ff911b1794d05370bd8b3912a8",
+    "src/main/java/io/github/muntashirakon/adb/ByteArrayNoThrowOutputStream.java": "60ec26142f0675140f2f4d1a3d12395b7ac734d8d9176dcfab30e94692ddd85b",
+    "src/main/java/io/github/muntashirakon/adb/KeyPair.java": "9c721834e8ca7186422653f0713239b400955e820ff780c004dacee5d93d539a",
+    "src/main/java/io/github/muntashirakon/adb/LocalServices.java": "9937c31afa15f191f15394299655a8a20cfe69cd92f2324f698a6f1f4890bb49",
+    "src/main/java/io/github/muntashirakon/adb/PRNGFixes.java": "f8f17b6d350a358f0f6ce0faee3755317552c6d8df42328a96c7f434b879e696",
+    "src/main/java/io/github/muntashirakon/adb/PairingAuthCtx.java": "45479417fa9244ec49ef77c89d99ab00858cffb97e5c9e1307447fea6b8aa7a4",
+    "src/main/java/io/github/muntashirakon/adb/PairingConnectionCtx.java": "dd5f1f6086e166b4fc95684a6a3f67e8732fb101dcf9631164741d0bd58861a1",
+    "src/main/java/io/github/muntashirakon/adb/SslUtils.java": "6123b205a1b1a57a2bf93817edb931b0252f03bcb43e8f9760b650e1021a63f0",
+    "src/main/java/io/github/muntashirakon/adb/StringCompat.java": "6c282874083a318ea2fb993beb9d61eabb827be23be252ff621643d7d4010090",
+    "src/main/java/io/github/muntashirakon/adb/android/AdbMdns.java": "ebc10f7dd7cc167c1129bd2f20343794e734288193bd4931c183a558e274f5c4",
+    "src/main/java/io/github/muntashirakon/adb/android/AndroidUtils.java": "565081e51525595c34b226bbf86644f0f514bdaa9bd542775c7e3c7a75df27dd",
+    "src/main/java/io/github/muntashirakon/adb/android/package.html": "395a894dceb60dbfffd50ca6233ece0573527b9648f8fed48a6fce7b2e0cea30"
+  },
+  "selectedLicense": "Apache-2.0 alternative with retained BSD/MIT/AOSP notices",
+  "purpose": "Source-built local patch for reproduced lost OPEN acknowledgements and interrupted-open cleanup; no binary rewriting or production reflection."
+}

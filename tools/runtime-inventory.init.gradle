@@ -1,0 +1,49 @@
+import groovy.json.JsonOutput
+import java.security.MessageDigest
+import org.gradle.api.attributes.Attribute
+
+gradle.projectsEvaluated {
+    def app = gradle.rootProject.project(':app')
+    def runtime = app.configurations.getByName('localReleaseRuntimeClasspath')
+    def archives = runtime.incoming.artifactView {
+        // Select code archives, including AGP's full JAR for a local Android source module.
+        attributes.attribute(Attribute.of('artifactType', String), 'android-aar-or-jar')
+    }
+    app.tasks.register('publicationRuntimeInventory') {
+        description = 'Exports resolved runtime artifact identities and SHA-256 without local paths.'
+        group = 'help'
+        dependsOn(archives.files)
+        doLast {
+            def identities = runtime.incoming.resolutionResult.allComponents.collectEntries {
+                [(it.id): it.moduleVersion]
+            }
+            def artifacts = archives.artifacts.artifacts
+                .collect { artifact ->
+                    def id = identities[artifact.id.componentIdentifier]
+                    if (id == null) {
+                        throw new GradleException("Missing runtime module identity for ${artifact.id.componentIdentifier}")
+                    }
+                    def digest = MessageDigest.getInstance('SHA-256')
+                    artifact.file.withInputStream { input ->
+                        byte[] buffer = new byte[65536]
+                        int count
+                        while ((count = input.read(buffer)) != -1) digest.update(buffer, 0, count)
+                    }
+                    [
+                        group: id.group,
+                        artifact: id.name,
+                        version: id.version,
+                        file: artifact.file.name,
+                        sha256: digest.digest().encodeHex().toString(),
+                    ]
+                }.unique().sort { a, b -> "${a.group}:${a.artifact}:${a.version}:${a.file}" <=> "${b.group}:${b.artifact}:${b.version}:${b.file}" }
+            def report = new File(app.layout.buildDirectory.get().asFile, 'reports/publication/runtime-artifacts.json')
+            report.parentFile.mkdirs()
+            report.setText(JsonOutput.prettyPrint(JsonOutput.toJson([
+                variant: 'localReleaseRuntimeClasspath',
+                artifacts: artifacts,
+            ])) + '\n', 'UTF-8')
+            println("Recorded ${artifacts.size()} runtime artifacts in ${report}")
+        }
+    }
+}
