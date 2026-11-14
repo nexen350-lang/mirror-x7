@@ -4,6 +4,7 @@ import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Color
+import android.graphics.Outline
 import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.Rect
@@ -13,8 +14,10 @@ import android.view.InputDevice
 import android.view.MotionEvent
 import android.view.SurfaceHolder
 import android.view.SurfaceView
+import android.view.View
 import android.view.ViewConfiguration
 import android.view.ViewGroup
+import android.view.ViewOutlineProvider
 import androidx.core.graphics.withTranslation
 import com.scrcpy.remote.scrcpy.ControlMessage
 import com.scrcpy.remote.session.MirrorViewModel
@@ -169,6 +172,36 @@ class ScrcpyMirrorView @JvmOverloads constructor(
             updateGestureExclusion()
         }
 
+    /** Corner radius applied to the view and surface outline in floating mirror window mode. */
+    var cornerRadiusPx: Float = 0f
+        set(value) {
+            val next = if (value.isFinite()) value.coerceAtLeast(0f) else 0f
+            if (field == next) return
+            field = next
+            updateCornerOutline()
+        }
+
+    private val roundedOutlineProvider = object : ViewOutlineProvider() {
+        override fun getOutline(view: View, outline: Outline) {
+            val radius = cornerRadiusPx.coerceAtMost(minOf(view.width, view.height) / 2f)
+            if (view.width > 0 && view.height > 0 && radius > 0f) {
+                outline.setRoundRect(0, 0, view.width, view.height, radius)
+            } else {
+                outline.setRect(0, 0, view.width, view.height)
+            }
+        }
+    }
+
+    private fun updateCornerOutline() {
+        val rounded = cornerRadiusPx > 0f
+        outlineProvider = if (rounded) roundedOutlineProvider else ViewOutlineProvider.BACKGROUND
+        clipToOutline = rounded
+        surfaceView.outlineProvider = if (rounded) roundedOutlineProvider else ViewOutlineProvider.BACKGROUND
+        surfaceView.clipToOutline = rounded
+        invalidateOutline()
+        surfaceView.invalidateOutline()
+    }
+
     private var videoWidth = 0
     private var videoHeight = 0
     var captureGeneration = 0L
@@ -268,6 +301,10 @@ class ScrcpyMirrorView @JvmOverloads constructor(
             left + geometry.contentWidth.toInt(),
             top + geometry.contentHeight.toInt(),
         )
+        if (cornerRadiusPx > 0f) {
+            invalidateOutline()
+            surfaceView.invalidateOutline()
+        }
         onGeometryChanged?.invoke(geometry)
         // Posted like the geometry above: a cursor that moved with the picture is reported once
         // layout has finished, not from inside it.
@@ -327,6 +364,7 @@ class ScrcpyMirrorView @JvmOverloads constructor(
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
         super.onSizeChanged(w, h, oldw, oldh)
         updateGestureExclusion()
+        if (cornerRadiusPx > 0f) invalidateOutline()
     }
 
     /**

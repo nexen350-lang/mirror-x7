@@ -357,4 +357,6 @@
     <string name="onboarding_back">Back</string>
     <string name="onboarding_skip">Skip</string>
     <string name="onboarding_done">Get started</string>
+    <string name="mirror_window_drag_handle">Move mirror window</string>
+    <string name="mirror_window_resize_handle">Resize mirror window</string>
 </resources>

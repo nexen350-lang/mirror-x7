@@ -90,4 +90,6 @@
     <string name="error_details_show">التفاصيل</string>
     <string name="error_details_hide">إخفاء التفاصيل</string>
     <string name="error_detail">التفاصيل: %1$s</string>
+    <string name="mirror_window_drag_handle">تحريك نافذة العرض</string>
+    <string name="mirror_window_resize_handle">تغيير حجم نافذة العرض</string>
 </resources>

@@ -35,21 +35,25 @@ fun TouchDiagnosticsOverlay(
     modifier: Modifier = Modifier,
     timing: MediaTimingDiagnostics = MediaTimingDiagnostics(),
     video: VideoFrameStats = VideoFrameStats(),
+    videoOffsetX: Float = 0f,
+    videoOffsetY: Float = 0f,
 ) {
     Box(modifier.fillMaxSize()) {
         if (layout?.isValid == true &&
             diagnostics.lastScreenWidth == videoWidth && diagnostics.lastScreenHeight == videoHeight
         ) {
             Canvas(Modifier.fillMaxSize()) {
-                val x = layout.contentLeft + (diagnostics.lastDeviceX + 0.5f) * layout.scaleX
-                val y = layout.contentTop + (diagnostics.lastDeviceY + 0.5f) * layout.scaleY
+                val x = videoOffsetX + layout.contentLeft + (diagnostics.lastDeviceX + 0.5f) * layout.scaleX
+                val y = videoOffsetY + layout.contentTop + (diagnostics.lastDeviceY + 0.5f) * layout.scaleY
                 val color = if (diagnostics.written) Color.Green else Color.Yellow
                 val arm = 12.dp.toPx()
                 drawLine(color, Offset(x - arm, y), Offset(x + arm, y), 1.dp.toPx())
                 drawLine(color, Offset(x, y - arm), Offset(x, y + arm), 1.dp.toPx())
-                drawCircle(Color.Cyan, 4.dp.toPx(), Offset(diagnostics.lastRawX, diagnostics.lastRawY),
+                drawCircle(Color.Cyan, 4.dp.toPx(),
+                    Offset(videoOffsetX + diagnostics.lastRawX, videoOffsetY + diagnostics.lastRawY),
                     style = Stroke(1.dp.toPx()))
-                drawRect(Color.White.copy(alpha = 0.4f), Offset(layout.contentLeft, layout.contentTop),
+                drawRect(Color.White.copy(alpha = 0.4f),
+                    Offset(videoOffsetX + layout.contentLeft, videoOffsetY + layout.contentTop),
                     Size(layout.contentWidth, layout.contentHeight), style = Stroke(1.dp.toPx()))
             }
         }

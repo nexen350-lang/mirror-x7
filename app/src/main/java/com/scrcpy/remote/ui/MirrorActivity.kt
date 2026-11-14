@@ -38,15 +38,22 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.absoluteOffset
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.requiredSize
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material3.Button
 import androidx.compose.material3.AlertDialog
@@ -66,26 +73,42 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.key
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
+import androidx.compose.ui.AbsoluteAlignment
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.RoundRect
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.layout.onPlaced
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.hideFromAccessibility
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.PathFillType
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.viewinterop.AndroidView
+import kotlin.math.roundToInt
 import androidx.core.content.IntentCompat
 import androidx.core.os.BundleCompat
 import androidx.core.view.WindowCompat
@@ -580,6 +603,7 @@ class MirrorActivity : ComponentActivity() {
                         viewModel = viewModel,
                         repository = repository,
                         savedDeviceId = savedDeviceId,
+                        windowDeviceKey = mirrorWindowDeviceKey(uiTarget.deviceId, uiTarget.host, uiTarget.port),
                         screenshots = screenshots,
                         linkRequest = linkRequest,
                         pipMode = pipMode,
@@ -848,6 +872,7 @@ private fun MirrorScreen(
     viewModel: MirrorViewModel,
     repository: DeviceRepository,
     savedDeviceId: String?,
+    windowDeviceKey: String,
     screenshots: ScreenshotViewModel,
     linkRequest: LinkRequest,
     pipMode: Boolean,
@@ -927,11 +952,54 @@ private fun MirrorScreen(
     val context = LocalContext.current
     // Resources, not the context: string lookups must follow configuration and locale changes.
     val resources = LocalResources.current
+    val density = LocalDensity.current
+    val layoutDirection = LocalLayoutDirection.current
     var viewportSize by remember { mutableStateOf(IntSize.Zero) }
     val viewportDensity = resources.displayMetrics.densityDpi
     LaunchedEffect(viewportSize, viewportDensity) {
         viewModel.updateDesktopViewport(viewportSize.width, viewportSize.height, viewportDensity)
     }
+    val windowSafeInsets = WindowInsets.safeDrawing
+    val outerMarginPx = with(density) { MIRROR_WINDOW_MARGIN.roundToPx() }
+    val topDragReservePx = with(density) { MIRROR_WINDOW_TOP_RESERVE.roundToPx() }
+    val sideBarFootprintPx = with(density) { (compactBarShortSide + ATTACHED_BAR_GAP).roundToPx() }
+    val minShortSidePx = with(density) { MIRROR_WINDOW_MIN_SHORT_SIDE.roundToPx() }
+    val safeLeft = windowSafeInsets.getLeft(density, layoutDirection) + outerMarginPx
+    val safeTop = windowSafeInsets.getTop(density) + outerMarginPx
+    val safeWindowBounds = ControlBounds(
+        left = safeLeft,
+        top = safeTop,
+        right = (viewportSize.width - windowSafeInsets.getRight(density, layoutDirection) - outerMarginPx)
+            .coerceAtLeast(safeLeft + 1),
+        bottom = (viewportSize.height - windowSafeInsets.getBottom(density) - outerMarginPx)
+            .coerceAtLeast(safeTop + 1),
+    )
+    val localLandscape = viewportSize.width > viewportSize.height
+    val remoteLandscape = landscape
+    var savedWindowFractions by remember(windowDeviceKey, localLandscape, remoteLandscape) {
+        mutableStateOf(
+            MirrorWindowPreferences.load(context, windowDeviceKey, localLandscape, remoteLandscape),
+        )
+    }
+    var liveWindowRect by remember { mutableStateOf<MirrorWindowRect?>(null) }
+    var draggingWindow by remember { mutableStateOf(false) }
+    var resizingWindow by remember { mutableStateOf(false) }
+    val settledWindowRect = if (connected != null && !hideSessionTools &&
+        viewportSize.width > 0 && viewportSize.height > 0
+    ) {
+        computeMirrorWindowRect(
+            safe = safeWindowBounds,
+            videoWidth = connected.videoWidth,
+            videoHeight = connected.videoHeight,
+            topDragReservePx = topDragReservePx,
+            sideBarFootprintPx = sideBarFootprintPx,
+            minShortSidePx = minShortSidePx,
+            saved = savedWindowFractions,
+        )
+    } else null
+    val activeWindowRect = if (connected != null && !hideSessionTools) {
+        liveWindowRect ?: settledWindowRect
+    } else null
     var calibrationRevision by remember { mutableLongStateOf(0L) }
     var pendingCalibration by remember(savedDeviceId) {
         mutableStateOf<Map<Boolean, Pair<Long, TouchCalibration?>>>(emptyMap())
@@ -1121,21 +1189,131 @@ private fun MirrorScreen(
 
             is MirrorUiState.Connected -> if (hideSessionTools && activeSettings?.camera == null) {
                 CameraPipStatus(R.string.camera_pip_failed)
-            } else key(current.sessionGeneration) {
-                MirrorSurface(
-                    viewModel = viewModel,
-                    state = current,
-                    settings = settings,
-                    cameraSession = activeSettings?.camera != null,
-                    inputState = inputState,
-                    zoom = viewZoom,
-                    onGeometryChanged = { geometry = it },
-                    onSurfaceBound = onSurfaceBound,
-                    precisionPad = padActive,
-                    padSpeed = padSpeed,
-                    padHandle = padHandle,
-                    hiddenFromAccessibility = controlsModal,
-                )
+            } else {
+                val windowCornerRadiusPx = if (activeWindowRect != null) {
+                    val minSide = minOf(activeWindowRect.width, activeWindowRect.height).toFloat()
+                    (minSide * 0.095f).coerceIn(
+                        with(density) { MIRROR_WINDOW_MIN_CORNER_RADIUS.toPx() },
+                        with(density) { MIRROR_WINDOW_MAX_CORNER_RADIUS.toPx() },
+                    )
+                } else 0f
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = if (activeWindowRect != null) AbsoluteAlignment.TopLeft else Alignment.Center,
+                ) {
+                    val surfaceContainerModifier = if (activeWindowRect != null) {
+                        Modifier
+                            .absoluteOffset { IntOffset(activeWindowRect.left, activeWindowRect.top) }
+                            .requiredSize(
+                                with(density) { activeWindowRect.width.toDp() },
+                                with(density) { activeWindowRect.height.toDp() },
+                            )
+                    } else {
+                        Modifier.fillMaxSize()
+                    }
+                    Box(surfaceContainerModifier) {
+                        key(current.sessionGeneration) {
+                            MirrorSurface(
+                                viewModel = viewModel,
+                                state = current,
+                                settings = settings,
+                                cameraSession = activeSettings?.camera != null,
+                                inputState = inputState,
+                                zoom = viewZoom,
+                                cornerRadiusPx = windowCornerRadiusPx,
+                                onGeometryChanged = { geometry = it },
+                                onSurfaceBound = onSurfaceBound,
+                                precisionPad = padActive,
+                                padSpeed = padSpeed,
+                                padHandle = padHandle,
+                                hiddenFromAccessibility = controlsModal,
+                            )
+                        }
+                        if (activeWindowRect != null) {
+                            MirrorWindowChrome(
+                                cornerRadiusPx = windowCornerRadiusPx,
+                                active = draggingWindow || resizingWindow,
+                                modifier = Modifier.matchParentSize(),
+                            )
+                        }
+                    }
+                    if (activeWindowRect != null && !inputState.locked) {
+                        val latestSafe by rememberUpdatedState(safeWindowBounds)
+                        val latestWindow by rememberUpdatedState(activeWindowRect)
+                        val latestVideoW by rememberUpdatedState(current.videoWidth)
+                        val latestVideoH by rememberUpdatedState(current.videoHeight)
+                        val latestLocalLand by rememberUpdatedState(localLandscape)
+                        val latestRemoteLand by rememberUpdatedState(remoteLandscape)
+                        fun persistWindow(rect: MirrorWindowRect) {
+                            val next = mirrorWindowToFractions(
+                                rect = rect,
+                                safe = latestSafe,
+                                videoWidth = latestVideoW,
+                                videoHeight = latestVideoH,
+                                topDragReservePx = topDragReservePx,
+                            )
+                            savedWindowFractions = next
+                            MirrorWindowPreferences.save(
+                                context,
+                                windowDeviceKey,
+                                latestLocalLand,
+                                latestRemoteLand,
+                                next,
+                            )
+                        }
+                        MirrorWindowTopDragBar(
+                            windowRect = activeWindowRect,
+                            active = draggingWindow,
+                            onDragStart = {
+                                draggingWindow = true
+                                liveWindowRect = latestWindow
+                                latestWindow
+                            },
+                            onDrag = { startRect, totalDx, totalDy ->
+                                liveWindowRect = dragMirrorWindow(
+                                    current = startRect,
+                                    deltaX = totalDx,
+                                    deltaY = totalDy,
+                                    safe = latestSafe,
+                                    topDragReservePx = topDragReservePx,
+                                )
+                            },
+                            onDragEnd = {
+                                draggingWindow = false
+                                liveWindowRect?.let(::persistWindow)
+                                liveWindowRect = null
+                            },
+                        )
+                        MirrorWindowCornerResizeHandle(
+                            windowRect = activeWindowRect,
+                            viewportSize = viewportSize,
+                            cornerRadiusPx = windowCornerRadiusPx,
+                            active = resizingWindow,
+                            onResizeStart = {
+                                resizingWindow = true
+                                liveWindowRect = latestWindow
+                                latestWindow
+                            },
+                            onResize = { startRect, totalDx, totalDy ->
+                                liveWindowRect = resizeMirrorWindowFromCorner(
+                                    start = startRect,
+                                    totalDeltaX = totalDx,
+                                    totalDeltaY = totalDy,
+                                    safe = latestSafe,
+                                    videoWidth = latestVideoW,
+                                    videoHeight = latestVideoH,
+                                    topDragReservePx = topDragReservePx,
+                                    minShortSidePx = minShortSidePx,
+                                )
+                            },
+                            onResizeEnd = {
+                                resizingWindow = false
+                                liveWindowRect?.let(::persistWindow)
+                                liveWindowRect = null
+                            },
+                        )
+                    }
+                }
             }
         }
 
@@ -1147,6 +1325,8 @@ private fun MirrorScreen(
                     layout = geometry,
                     videoWidth = connected.videoWidth,
                     videoHeight = connected.videoHeight,
+                    videoOffsetX = (activeWindowRect?.left ?: 0).toFloat(),
+                    videoOffsetY = (activeWindowRect?.top ?: 0).toFloat(),
                 )
             }
 
@@ -1250,6 +1430,7 @@ private fun MirrorScreen(
                 },
                 inputLockBanner = lockBanner,
                 onPanelModalChanged = { controlsModal = it },
+                attachedWindow = activeWindowRect?.toControlBounds(),
             )
         }
         if (connected == null && inputState.locked && !hideSessionTools) {
@@ -1702,6 +1883,8 @@ private fun MirrorDiagnostics(
     layout: VideoLayout?,
     videoWidth: Int,
     videoHeight: Int,
+    videoOffsetX: Float = 0f,
+    videoOffsetY: Float = 0f,
 ) {
     val diagnostics by viewModel.diagnostics.collectAsState()
     val timing by viewModel.mediaTiming.collectAsState()
@@ -1713,6 +1896,8 @@ private fun MirrorDiagnostics(
         videoHeight = videoHeight,
         timing = timing,
         video = frames,
+        videoOffsetX = videoOffsetX,
+        videoOffsetY = videoOffsetY,
     )
 }
 
@@ -1863,6 +2048,211 @@ private fun rememberMirrorActions(    viewModel: MirrorViewModel,
 )
 }
 
+private val MIRROR_WINDOW_MARGIN = 8.dp
+private val MIRROR_WINDOW_TOP_RESERVE = 26.dp
+private val MIRROR_WINDOW_MIN_SHORT_SIDE = 140.dp
+private val MIRROR_WINDOW_MIN_CORNER_RADIUS = 18.dp
+private val MIRROR_WINDOW_MAX_CORNER_RADIUS = 32.dp
+private val MIRROR_WINDOW_RESIZE_HIT_SIZE = 38.dp
+
+/**
+ * Masks outer corners over hardware surfaces on older API levels and draws the subtle hairline
+ * bezel border around the rounded phone window.
+ */
+@Composable
+private fun MirrorWindowChrome(
+    cornerRadiusPx: Float,
+    active: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    val maskPath = remember { Path() }
+    Canvas(modifier) {
+        val radius = cornerRadiusPx.coerceAtMost(minOf(size.width, size.height) / 2f)
+        maskPath.reset()
+        maskPath.fillType = PathFillType.EvenOdd
+        maskPath.addRect(androidx.compose.ui.geometry.Rect(0f, 0f, size.width, size.height))
+        maskPath.addRoundRect(
+            RoundRect(
+                left = 0f,
+                top = 0f,
+                right = size.width,
+                bottom = size.height,
+                cornerRadius = CornerRadius(radius, radius),
+            ),
+        )
+        drawPath(maskPath, Color.Black)
+        val strokeWidth = 1.dp.toPx()
+        val halfStroke = strokeWidth / 2f
+        val borderRadius = (radius - halfStroke).coerceAtLeast(0f)
+        drawRoundRect(
+            color = Color.White.copy(alpha = if (active) 0.42f else 0.22f),
+            topLeft = Offset(halfStroke, halfStroke),
+            size = Size((size.width - strokeWidth).coerceAtLeast(0f), (size.height - strokeWidth).coerceAtLeast(0f)),
+            cornerRadius = CornerRadius(borderRadius, borderRadius),
+            style = Stroke(width = strokeWidth),
+        )
+    }
+}
+
+@Composable
+private fun MirrorWindowTopDragBar(
+    windowRect: MirrorWindowRect,
+    active: Boolean,
+    onDragStart: () -> MirrorWindowRect,
+    onDrag: (MirrorWindowRect, Float, Float) -> Unit,
+    onDragEnd: () -> Unit,
+) {
+    val density = LocalDensity.current
+    val hitHeightPx = with(density) { MIRROR_WINDOW_TOP_RESERVE.roundToPx() }
+    val hitWidthPx = (windowRect.width * 0.5f)
+        .roundToInt()
+        .coerceIn(
+            minOf(windowRect.width, with(density) { 84.dp.roundToPx() }),
+            maxOf(windowRect.width.coerceAtLeast(1), with(density) { 160.dp.roundToPx() }),
+        )
+        .coerceAtMost(windowRect.width.coerceAtLeast(1))
+    val left = windowRect.left + (windowRect.width - hitWidthPx) / 2
+    val top = (windowRect.top - hitHeightPx).coerceAtLeast(0)
+    val label = stringResource(R.string.mirror_window_drag_handle)
+    var nodePosInRoot by remember { mutableStateOf(Offset.Zero) }
+    val latestOnDragStart by rememberUpdatedState(onDragStart)
+    val latestOnDrag by rememberUpdatedState(onDrag)
+    val latestOnDragEnd by rememberUpdatedState(onDragEnd)
+
+    Box(
+        modifier = Modifier
+            .absoluteOffset { IntOffset(left, top) }
+            .size(with(density) { hitWidthPx.toDp() }, MIRROR_WINDOW_TOP_RESERVE)
+            .onPlaced { nodePosInRoot = it.positionInRoot() }
+            .testTag("mirror-window-drag-bar")
+            .semantics { contentDescription = label }
+            .pointerInput(Unit) {
+                var startRect: MirrorWindowRect? = null
+                var startFingerRoot = Offset.Zero
+                detectDragGestures(
+                    onDragStart = { localOffset ->
+                        startFingerRoot = nodePosInRoot + localOffset
+                        startRect = latestOnDragStart()
+                    },
+                    onDragEnd = {
+                        startRect = null
+                        latestOnDragEnd()
+                    },
+                    onDragCancel = {
+                        startRect = null
+                        latestOnDragEnd()
+                    },
+                ) { change, _ ->
+                    change.consume()
+                    val origin = startRect ?: return@detectDragGestures
+                    val currentFingerRoot = nodePosInRoot + change.position
+                    latestOnDrag(
+                        origin,
+                        currentFingerRoot.x - startFingerRoot.x,
+                        currentFingerRoot.y - startFingerRoot.y,
+                    )
+                }
+            },
+        contentAlignment = Alignment.Center,
+    ) {
+        val pillWidthDp = with(density) { (hitWidthPx * 0.85f).roundToInt().toDp() }.coerceAtLeast(56.dp)
+        Canvas(Modifier.size(pillWidthDp, 16.dp)) {
+            drawRoundRect(
+                color = Color(0xFF1C1C20).copy(alpha = 0.92f),
+                cornerRadius = CornerRadius(size.height / 2f, size.height / 2f),
+            )
+            drawRoundRect(
+                color = Color.White.copy(alpha = if (active) 0.42f else 0.18f),
+                cornerRadius = CornerRadius(size.height / 2f, size.height / 2f),
+                style = Stroke(width = 1.dp.toPx()),
+            )
+            val grabW = (size.width * 0.42f).coerceIn(24.dp.toPx(), 44.dp.toPx())
+            val grabH = 3.5.dp.toPx()
+            drawRoundRect(
+                color = Color.White.copy(alpha = if (active) 0.88f else 0.54f),
+                topLeft = Offset((size.width - grabW) / 2f, (size.height - grabH) / 2f),
+                size = Size(grabW, grabH),
+                cornerRadius = CornerRadius(grabH / 2f, grabH / 2f),
+            )
+        }
+    }
+}
+
+@Composable
+private fun MirrorWindowCornerResizeHandle(
+    windowRect: MirrorWindowRect,
+    viewportSize: IntSize,
+    cornerRadiusPx: Float,
+    active: Boolean,
+    onResizeStart: () -> MirrorWindowRect,
+    onResize: (MirrorWindowRect, Float, Float) -> Unit,
+    onResizeEnd: () -> Unit,
+) {
+    val density = LocalDensity.current
+    val hitSizePx = with(density) { MIRROR_WINDOW_RESIZE_HIT_SIZE.roundToPx() }
+    val overhangPx = with(density) { 14.dp.roundToPx() }
+    val maxLeft = (viewportSize.width - hitSizePx).coerceAtLeast(0)
+    val maxTop = (viewportSize.height - hitSizePx).coerceAtLeast(0)
+    val left = (windowRect.right + overhangPx - hitSizePx).coerceIn(0, maxLeft)
+    val top = (windowRect.bottom + overhangPx - hitSizePx).coerceIn(0, maxTop)
+    val label = stringResource(R.string.mirror_window_resize_handle)
+    var nodePosInRoot by remember { mutableStateOf(Offset.Zero) }
+    val latestOnResizeStart by rememberUpdatedState(onResizeStart)
+    val latestOnResize by rememberUpdatedState(onResize)
+    val latestOnResizeEnd by rememberUpdatedState(onResizeEnd)
+
+    Box(
+        modifier = Modifier
+            .absoluteOffset { IntOffset(left, top) }
+            .size(MIRROR_WINDOW_RESIZE_HIT_SIZE)
+            .onPlaced { nodePosInRoot = it.positionInRoot() }
+            .testTag("mirror-window-resize-handle")
+            .semantics { contentDescription = label }
+            .pointerInput(Unit) {
+                var startRect: MirrorWindowRect? = null
+                var startFingerRoot = Offset.Zero
+                detectDragGestures(
+                    onDragStart = { localOffset ->
+                        startFingerRoot = nodePosInRoot + localOffset
+                        startRect = latestOnResizeStart()
+                    },
+                    onDragEnd = {
+                        startRect = null
+                        latestOnResizeEnd()
+                    },
+                    onDragCancel = {
+                        startRect = null
+                        latestOnResizeEnd()
+                    },
+                ) { change, _ ->
+                    change.consume()
+                    val origin = startRect ?: return@detectDragGestures
+                    val currentFingerRoot = nodePosInRoot + change.position
+                    latestOnResize(
+                        origin,
+                        currentFingerRoot.x - startFingerRoot.x,
+                        currentFingerRoot.y - startFingerRoot.y,
+                    )
+                }
+            },
+    ) {
+        Canvas(Modifier.fillMaxSize()) {
+            val arcRadius = (cornerRadiusPx + 3.dp.toPx()).coerceIn(14.dp.toPx(), 34.dp.toPx())
+            val cornerCenterX = (windowRect.right - left) - cornerRadiusPx
+            val cornerCenterY = (windowRect.bottom - top) - cornerRadiusPx
+            drawArc(
+                color = Color.White.copy(alpha = if (active) 0.92f else 0.56f),
+                startAngle = 12f,
+                sweepAngle = 66f,
+                useCenter = false,
+                topLeft = Offset(cornerCenterX - arcRadius, cornerCenterY - arcRadius),
+                size = Size(arcRadius * 2f, arcRadius * 2f),
+                style = Stroke(width = 2.5.dp.toPx(), cap = StrokeCap.Round),
+            )
+        }
+    }
+}
+
 @Composable
 private fun MirrorSurface(
     viewModel: MirrorViewModel,
@@ -1871,6 +2261,7 @@ private fun MirrorSurface(
     cameraSession: Boolean,
     inputState: com.scrcpy.remote.session.SessionInputState,
     zoom: Float,
+    cornerRadiusPx: Float = 0f,
     onGeometryChanged: (VideoLayout) -> Unit,
     onSurfaceBound: (SurfaceView, Boolean) -> Unit,
     precisionPad: Boolean,
@@ -1929,6 +2320,7 @@ private fun MirrorSurface(
                 with(density) { settings.touchOffsetYDp.dp.toPx() },
             )
             view.captureEdgeGestures = settings.captureEdgeGestures
+            view.cornerRadiusPx = cornerRadiusPx
             view.setVideoSize(state.videoWidth, state.videoHeight, state.captureGeneration)
             view.setZoom(zoom)
             view.precisionPadSpeed = padSpeed
