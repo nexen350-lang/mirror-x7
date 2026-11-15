@@ -2706,7 +2706,7 @@ private fun MirrorSurface(
                 padHandle.view = this
                 latestOnViewReady(this)
                 onPrecisionPadChanged = { dragging, _, cursorY -> padHandle.update(dragging, cursorY) }
-                onZoomChanged = { updatedZoom -> post { latestOnZoomChanged(updatedZoom) } }
+                this.onZoomChanged = { updatedZoom -> post { latestOnZoomChanged(updatedZoom) } }
                 onTouch = { action, pointerId, x, y, pressure, srcW, srcH, rawX, rawY ->
                     viewModel.sendTouch(action, pointerId, x, y, pressure, srcW, srcH, rawX, rawY,
                         state.sessionGeneration, captureGeneration, this.inputState.generation)

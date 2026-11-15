@@ -13,6 +13,7 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -150,7 +151,7 @@ class TabletMirroringUiTest {
 
         compose.onNodeWithTag("mirror-control-strip").assertIsDisplayed()
         compose.waitUntil(timeoutMillis = 3_000L) {
-            compose.onAllNodes(androidx.compose.ui.test.hasTestTag("mirror-control-strip-wake")).fetchSemanticsNodes().isNotEmpty()
+            compose.onAllNodesWithTag("mirror-control-strip-wake").fetchSemanticsNodes().isNotEmpty()
         }
         compose.onNodeWithTag("mirror-control-strip-wake").assertIsDisplayed().performClick()
         compose.onNodeWithTag("mirror-control-strip").assertIsDisplayed()
