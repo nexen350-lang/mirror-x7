@@ -4,7 +4,6 @@ import android.app.Application
 import android.net.Uri
 import android.util.Log
 import android.view.SurfaceView
-import android.view.TextureView
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
@@ -78,14 +77,6 @@ class ScreenshotViewModel(application: Application, private val saved: SavedStat
         launchCapture { exporter.capture(surface) }
     }
 
-    fun captureTexture(texture: TextureView?) {
-        if (texture == null) {
-            reportNotReady()
-            return
-        }
-        launchCapture { exporter.capture(texture) }
-    }
-
     private fun reportNotReady() {
         if (_state.value.busy) return
         _state.value = ScreenshotState(notice = getApplication<Application>().getString(R.string.screenshot_error_not_ready))
@@ -135,14 +126,6 @@ class ScreenshotViewModel(application: Application, private val saved: SavedStat
             return
         }
         launchShareCapture { exporter.capture(surface) }
-    }
-
-    fun shareCaptureTexture(texture: TextureView?) {
-        if (texture == null) {
-            reportNotReady()
-            return
-        }
-        launchShareCapture { exporter.capture(texture) }
     }
 
     private fun launchShareCapture(block: suspend () -> PendingScreenshot) {

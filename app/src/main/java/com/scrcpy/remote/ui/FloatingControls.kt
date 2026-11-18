@@ -325,10 +325,6 @@ internal val compactBarLongSide = compactBarLength(COMPACT_BUTTON_COUNT)
 /** The most the bar can ever need, so a docked letterbox does not shrink under a recording. */
 internal val compactBarLongSideMax = compactBarLength(COMPACT_BUTTON_COUNT_MAX)
 internal val compactBarShortSide = COMPACT_BUTTON_SIZE + COMPACT_BAR_PADDING * 2
-internal val ATTACHED_BAR_GAP = 8.dp
-
-internal fun attachedCompactButtonCount(cameraSession: Boolean, recording: Boolean): Int =
-    (if (cameraSession) CAMERA_COMPACT_BUTTON_COUNT else COMPACT_BUTTON_COUNT) + (if (recording) 1 else 0)
 
 /** Columns used when the window is too small for a single row or column. */
 private const val COMPACT_GRID_COLUMNS = 3
@@ -339,7 +335,7 @@ private const val COMPACT_GRID_COLUMNS = 3
  * Keeping the controls in an overlay lets the mirrored video surface use the entire display.
  */
 @Composable
-internal fun FloatingControlsOverlay(
+fun FloatingControlsOverlay(
     actions: MirrorActions,
     muted: Boolean,
     modifier: Modifier = Modifier,
@@ -347,11 +343,10 @@ internal fun FloatingControlsOverlay(
     onLocalTypingChanged: (Boolean) -> Unit = {},
     inputLockBanner: InputLockBannerPlacement? = null,
     onPanelModalChanged: (Boolean) -> Unit = {},
-    attachedWindow: ControlBounds? = null,
 ) {
     ScrcpyRemoteTheme(darkTheme = true) {
         FloatingControlsContent(actions, muted, modifier, videoLayout, onLocalTypingChanged, inputLockBanner,
-            onPanelModalChanged, attachedWindow)
+            onPanelModalChanged)
     }
 }
 
@@ -364,7 +359,6 @@ private fun FloatingControlsContent(
     onLocalTypingChanged: (Boolean) -> Unit,
     inputLockBanner: InputLockBannerPlacement?,
     onPanelModalChanged: (Boolean) -> Unit,
-    attachedWindow: ControlBounds?,
 ) {
     BoxWithConstraints(modifier, contentAlignment = AbsoluteAlignment.TopLeft) {
         val density = LocalDensity.current
@@ -381,10 +375,9 @@ private fun FloatingControlsContent(
         val minX = (handleInsets.getLeft(density, layoutDirection) + marginPx).coerceAtMost(maxX)
         val minY = (handleInsets.getTop(density) + marginPx).coerceAtMost(maxY)
 
-        val hasAttachedWindow = attachedWindow != null
         var positionX by rememberSaveable { mutableFloatStateOf(1f) }
         var positionY by rememberSaveable { mutableFloatStateOf(0.5f) }
-        var expanded by rememberSaveable(hasAttachedWindow) { mutableStateOf(hasAttachedWindow) }
+        var expanded by rememberSaveable { mutableStateOf(false) }
         var toolsExpanded by rememberSaveable { mutableStateOf(false) }
         var keyboardVisible by rememberSaveable { mutableStateOf(false) }
         // The draft field only exists while this is true and takes focus as soon as it appears,
@@ -409,43 +402,25 @@ private fun FloatingControlsContent(
 
         fun resolvedX(): Float = minX + positionX * (maxX - minX)
         fun resolvedY(): Float = minY + positionY * (maxY - minY)
-        val attachedSafeInsets = WindowInsets.safeDrawing
-        val docking = if (attachedWindow != null) {
-            val buttonCount = attachedCompactButtonCount(actions.cameraSession, actions.recording)
-            val attachedSafe = ControlBounds(
-                attachedSafeInsets.getLeft(density, layoutDirection) + marginPx.roundToInt(),
-                attachedSafeInsets.getTop(density) + marginPx.roundToInt(),
-                constraints.maxWidth - attachedSafeInsets.getRight(density, layoutDirection) - marginPx.roundToInt(),
-                constraints.maxHeight - attachedSafeInsets.getBottom(density) - marginPx.roundToInt(),
-            )
-            attachCompactNavigationToWindow(
-                window = attachedWindow,
-                safe = attachedSafe,
-                barWidth = with(density) { compactBarShortSide.roundToPx() },
-                barHeight = with(density) { compactBarLength(buttonCount).roundToPx() },
-                gap = with(density) { ATTACHED_BAR_GAP.roundToPx() },
-            )
-        } else {
-            dockCompactNavigation(
-                content = videoLayout,
-                viewWidth = constraints.maxWidth,
-                viewHeight = constraints.maxHeight,
-                safe = ControlBounds(
-                    safeInsets.getLeft(density, layoutDirection) + marginPx.roundToInt(),
-                    safeInsets.getTop(density) + marginPx.roundToInt(),
-                    constraints.maxWidth - safeInsets.getRight(density, layoutDirection) - marginPx.roundToInt(),
-                    constraints.maxHeight - safeInsets.getBottom(density) - marginPx.roundToInt(),
-                ),
-                longSide = with(density) {
-                    (if (actions.cameraSession) compactBarLength(CAMERA_COMPACT_BUTTON_COUNT + 1)
-                        else compactBarLongSideMax).roundToPx()
-                },
-                shortSide = with(density) { compactBarShortSide.roundToPx() },
-                gap = marginPx.roundToInt(),
-                handle = ControlBounds(resolvedX().roundToInt(), resolvedY().roundToInt(),
-                    (resolvedX() + handleSizePx).roundToInt(), (resolvedY() + handleSizePx).roundToInt()),
-            )
-        }
+        val docking = dockCompactNavigation(
+            content = videoLayout,
+            viewWidth = constraints.maxWidth,
+            viewHeight = constraints.maxHeight,
+            safe = ControlBounds(
+                safeInsets.getLeft(density, layoutDirection) + marginPx.roundToInt(),
+                safeInsets.getTop(density) + marginPx.roundToInt(),
+                constraints.maxWidth - safeInsets.getRight(density, layoutDirection) - marginPx.roundToInt(),
+                constraints.maxHeight - safeInsets.getBottom(density) - marginPx.roundToInt(),
+            ),
+            longSide = with(density) {
+                (if (actions.cameraSession) compactBarLength(CAMERA_COMPACT_BUTTON_COUNT + 1)
+                    else compactBarLongSideMax).roundToPx()
+            },
+            shortSide = with(density) { compactBarShortSide.roundToPx() },
+            gap = marginPx.roundToInt(),
+            handle = ControlBounds(resolvedX().roundToInt(), resolvedY().roundToInt(),
+                (resolvedX() + handleSizePx).roundToInt(), (resolvedY() + handleSizePx).roundToInt()),
+        )
         fun compact() {
             toolsExpanded = false
             keyboardVisible = false
@@ -470,14 +445,10 @@ private fun FloatingControlsContent(
                 compact()
             }
         }
-        LaunchedEffect(actions.inputLocked, hasAttachedWindow) {
-            if (actions.inputLocked) {
-                if (hasAttachedWindow) compact() else collapse()
-            }
+        LaunchedEffect(actions.inputLocked) {
+            if (actions.inputLocked) collapse()
         }
-        BackHandler(enabled = if (hasAttachedWindow) toolsExpanded else expanded) {
-            if (hasAttachedWindow) compact() else collapse()
-        }
+        BackHandler(enabled = expanded) { collapse() }
 
         // A cancelled click must not end an active drag's idle suppression.
         LaunchedEffect(interactionCount, expanded, dragging, pressed) {
@@ -573,9 +544,8 @@ private fun FloatingControlsContent(
         }
 
         // Draw above the handle so a saved handle position can never obscure Exit or Hide.
-        val controlsVisible = expanded && !(hasAttachedWindow && actions.inputLocked)
         AnimatedVisibility(
-            visible = controlsVisible,
+            visible = expanded,
             modifier = if (toolsExpanded || docking == null) Modifier.align(Alignment.BottomCenter)
                 else Modifier.absoluteOffset { IntOffset(docking.bounds.left, docking.bounds.top) },
             enter = fadeIn() + slideInVertically { it / 2 },
@@ -619,7 +589,7 @@ private fun FloatingControlsContent(
 }
 
 @Composable
-internal fun CompactNavigationBar(
+private fun CompactNavigationBar(
     actions: MirrorActions,
     onMore: () -> Unit,
     onInteraction: () -> Unit,

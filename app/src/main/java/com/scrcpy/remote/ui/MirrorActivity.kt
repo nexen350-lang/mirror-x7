@@ -12,10 +12,8 @@ import android.content.pm.PackageManager
 import android.content.res.Configuration
 import android.graphics.Rect
 import android.os.Build
-import android.net.Uri
 import android.os.Bundle
 import android.os.PowerManager
-import android.provider.Settings
 import android.util.Log
 import android.util.Rational
 import android.view.InputDevice
@@ -34,33 +32,19 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.gestures.detectDragGestures
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.absoluteOffset
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.requiredSize
-import androidx.compose.foundation.layout.safeDrawing
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material3.Button
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -75,44 +59,26 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.key
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
-import androidx.compose.ui.AbsoluteAlignment
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.CornerRadius
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.RoundRect
-import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.layout.onPlaced
 import androidx.compose.ui.layout.onSizeChanged
-import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.hideFromAccessibility
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.PathFillType
-import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.viewinterop.AndroidView
-import kotlin.math.abs
-import kotlin.math.roundToInt
 import androidx.core.content.IntentCompat
 import androidx.core.os.BundleCompat
 import androidx.core.view.WindowCompat
@@ -158,21 +124,6 @@ class MirrorActivity : ComponentActivity() {
     private var pipReturnRequested = false
     private var pipReturnWatchdog: Job? = null
     private var pipDialogOpen = false
-    private var activityStarted by mutableStateOf(false)
-    private var overlayActive by mutableStateOf(false)
-    private var overlayRequested by mutableStateOf(false)
-    private var overlayDisabledForSession by mutableStateOf(false)
-    private var pendingOverlayPermissionLaunch by mutableStateOf(false)
-    private var showOverlayPermissionDialog by mutableStateOf(false)
-    private var overlayDialogRequest by mutableStateOf<OverlayDialogRequest?>(null)
-    private var overlayTemporaryPortraitCalibration by mutableStateOf<TouchCalibration?>(null)
-    private var overlayTemporaryLandscapeCalibration by mutableStateOf<TouchCalibration?>(null)
-    private var overlayController: MirrorOverlayController? = null
-    private var savedDeviceIdForOverlay: String? = null
-    private var windowDeviceKeyForOverlay: String = ""
-    private var linkRequestForOverlay: LinkRequest = LinkRequest()
-    private var deviceLabelForOverlay: String? = null
-    private var overlayMoveToBackgroundOnAttach = false
     private val hideSessionTools: Boolean get() = pipMode || pipEntryRequested
     private val supportsCameraPip by lazy {
         packageManager.hasSystemFeature(PackageManager.FEATURE_PICTURE_IN_PICTURE)
@@ -197,7 +148,6 @@ class MirrorActivity : ComponentActivity() {
      * left the chosen document empty or partial. The screen stays until that work has settled.
      */
     private fun leaveSession() {
-        deactivateOverlay()
         viewModel.disconnect()
         if (artefactWorkPending()) exitAfterRecording = true else finish()
     }
@@ -431,11 +381,6 @@ class MirrorActivity : ComponentActivity() {
     private val shareArtefact = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
         shareChooserOpen = false
     }
-    private val requestOverlayPermission =
-        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
-            pendingOverlayPermissionLaunch = false
-            reconcileOverlayMode()
-        }
     private var notificationsRequested = false
 
     private fun ensureNotificationPermission() {
@@ -458,9 +403,6 @@ class MirrorActivity : ComponentActivity() {
      */
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
-        if (intent.action == ACTION_BRING_TO_FRONT) {
-            return
-        }
         if (intent.action == ACTION_RETURN_FROM_PIP) {
             if (pipCloseArmed || isInPictureInPictureMode) watchCameraPipReturn()
             return
@@ -483,8 +425,6 @@ class MirrorActivity : ComponentActivity() {
         if (current == null || !sameEndpoint(current.host, current.port, next.host, next.port)) {
             viewModel.setInputLocked(false)
         }
-        overlayRequested = false
-        overlayDisabledForSession = false
         exitAfterRecording = false
         setIntent(intent)
         val sessionState = viewModel.state.value
@@ -521,7 +461,6 @@ class MirrorActivity : ComponentActivity() {
         // memory: the rebuilt screen reconnected to the first device and queued a sent file again.
         savedInstanceState?.let { BundleCompat.getParcelable(it, STATE_TARGET, Intent::class.java) }?.let(::setIntent)
         exitAfterRecording = savedInstanceState?.getBoolean(STATE_EXIT_AFTER_RECORDING) == true
-        overlayRequested = savedInstanceState?.getBoolean(STATE_OVERLAY_REQUESTED) == true
         pipMode = isInPictureInPictureMode
         pipCloseArmed = pipMode
         documentPickerOpen = savedInstanceState?.getBoolean(STATE_DOCUMENT_PICKER) == true
@@ -585,11 +524,6 @@ class MirrorActivity : ComponentActivity() {
         // foreground-service start once the process has already been backgrounded.
         val deviceLabel = repository.getDevices().firstOrNull { it.id == savedDeviceId }?.name
         val uiTarget = requireNotNull(MirrorTarget.from(intent))
-        val targetDeviceKey = mirrorWindowDeviceKey(uiTarget.deviceId, uiTarget.host, uiTarget.port)
-        savedDeviceIdForOverlay = savedDeviceId
-        windowDeviceKeyForOverlay = targetDeviceKey
-        linkRequestForOverlay = linkRequest
-        deviceLabelForOverlay = deviceLabel
         // One derived reason drives the service, so the two things that need the process alive —
         // a live session and a pending transfer — can never tear down each other's hold.
         lifecycleScope.launch {
@@ -603,11 +537,6 @@ class MirrorActivity : ComponentActivity() {
                     // in both would say it twice, and reporting only here said it only for audio.
                     MirrorSessionService.start(this@MirrorActivity, deviceLabel, hold)
                 }
-            }
-        }
-        lifecycleScope.launch {
-            combine(viewModel.state, viewModel.activeSettings) { st, active -> st to active }.collect {
-                reconcileOverlayMode()
             }
         }
         lifecycleScope.launch {
@@ -644,7 +573,6 @@ class MirrorActivity : ComponentActivity() {
                         viewModel = viewModel,
                         repository = repository,
                         savedDeviceId = savedDeviceId,
-                        windowDeviceKey = targetDeviceKey,
                         screenshots = screenshots,
                         linkRequest = linkRequest,
                         pipMode = pipMode,
@@ -658,24 +586,8 @@ class MirrorActivity : ComponentActivity() {
                         onRequestCameraPip = { requestCameraPictureInPicture() },
                         onPipStateChanged = ::reconcileCameraPip,
                         onShareArtefact = ::launchArtefactShare,
-                        onRequestScreenshot = {
-                            if (canUseSessionTools()) {
-                                if (overlayActive) {
-                                    screenshots.captureTexture(overlayController?.activeTextureView)
-                                } else {
-                                    screenshots.capture(screenshotSurface)
-                                }
-                            }
-                        },
-                        onRequestShareScreenshot = {
-                            if (canUseSessionTools()) {
-                                if (overlayActive) {
-                                    screenshots.shareCaptureTexture(overlayController?.activeTextureView)
-                                } else {
-                                    screenshots.shareCapture(screenshotSurface)
-                                }
-                            }
-                        },
+                        onRequestScreenshot = { if (canUseSessionTools()) screenshots.capture(screenshotSurface) },
+                        onRequestShareScreenshot = { if (canUseSessionTools()) screenshots.shareCapture(screenshotSurface) },
                         onSaveRecording = { name ->
                             if (canUseSessionTools()) {
                                 documentPickerOpen = true
@@ -697,31 +609,6 @@ class MirrorActivity : ComponentActivity() {
                         onLocalTypingChanged = {
                             typingLocally = it
                             viewModel.onLocalTypingChanged(it)
-                        },
-                        overlayActive = overlayActive,
-                        showOverlayPermissionDialog = showOverlayPermissionDialog,
-                        onAllowOverlayPermission = ::launchOverlayPermissionSettings,
-                        onDeclineOverlayPermission = {
-                            MirrorWindowPreferences.markOverlayPermissionPrompted(this@MirrorActivity)
-                            showOverlayPermissionDialog = false
-                            overlayDisabledForSession = true
-                        },
-                        onMinimizeToOverlay = {
-                            if (overlayActive) moveTaskToBack(true)
-                        },
-                        onSwitchToInApp = {
-                            overlayRequested = false
-                            overlayDisabledForSession = true
-                            deactivateOverlay()
-                        },
-                        overlayDialogRequest = overlayDialogRequest,
-                        onOverlayDialogConsumed = { overlayDialogRequest = null },
-                        externalTemporaryCalibration = { land ->
-                            if (land) overlayTemporaryLandscapeCalibration else overlayTemporaryPortraitCalibration
-                        },
-                        onExternalTemporaryCalibrationChange = { land, value ->
-                            if (land) overlayTemporaryLandscapeCalibration = value
-                            else overlayTemporaryPortraitCalibration = value
                         },
                         onDisconnect = ::leaveSession,
                     )
@@ -802,146 +689,15 @@ class MirrorActivity : ComponentActivity() {
         return viewModel.sendKeyEvent(action, keyCode, event.repeatCount, event.metaState)
     }
 
-    private fun updateViewModelVisibility() {
-        viewModel.onVisibilityChanged(activityStarted || overlayActive)
-    }
-
-    private fun reconcileOverlayMode() {
-        val connected = viewModel.state.value as? MirrorUiState.Connected
-        val isScreenSession = connected != null && viewModel.activeSettings.value?.camera == null
-        if (!overlayRequested || !isScreenSession || hideSessionTools ||
-            isInPictureInPictureMode || overlayDisabledForSession
-        ) {
-            showOverlayPermissionDialog = false
-            deactivateOverlay()
-            return
-        }
-        if (Settings.canDrawOverlays(this)) {
-            showOverlayPermissionDialog = false
-            if (!overlayActive) {
-                activateOverlay(moveAppToBackground = resumed && !pendingOverlayPermissionLaunch)
-            }
-        } else {
-            if (overlayActive) {
-                deactivateOverlay()
-            }
-            if (!MirrorWindowPreferences.hasPromptedOverlayPermission(this) &&
-                !pendingOverlayPermissionLaunch && resumed
-            ) {
-                showOverlayPermissionDialog = true
-            }
-        }
-    }
-
-    private fun launchOverlayPermissionSettings() {
-        MirrorWindowPreferences.markOverlayPermissionPrompted(this)
-        showOverlayPermissionDialog = false
-        pendingOverlayPermissionLaunch = true
-        val permissionIntent = Intent(
-            Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-            Uri.parse("package:$packageName"),
-        )
-        try {
-            requestOverlayPermission.launch(permissionIntent)
-        } catch (_: ActivityNotFoundException) {
-            pendingOverlayPermissionLaunch = false
-            viewModel.showNotice(getString(R.string.overlay_permission_unavailable))
-        }
-    }
-
-    private fun activateOverlay(moveAppToBackground: Boolean) {
-        if (overlayActive) return
-        val controller = overlayController ?: MirrorOverlayController(
-            context = applicationContext,
-            viewModel = viewModel,
-            repository = DeviceRepository.get(this),
-            savedDeviceId = savedDeviceIdForOverlay,
-            windowDeviceKey = windowDeviceKeyForOverlay,
-            linkRequest = linkRequestForOverlay,
-            screenshots = screenshots,
-            onAttached = {
-                if (overlayMoveToBackgroundOnAttach && resumed && overlayActive && overlayDialogRequest == null) {
-                    overlayMoveToBackgroundOnAttach = false
-                    moveTaskToBack(true)
-                }
-            },
-            onExitRequested = {
-                overlayDisabledForSession = true
-                deactivateOverlay()
-                leaveSession()
-            },
-            onDialogRequested = ::bringActivityToFrontForDialog,
-            onUpdateTemporaryCalibration = { land, value ->
-                if (land) overlayTemporaryLandscapeCalibration = value
-                else overlayTemporaryPortraitCalibration = value
-            },
-            temporaryCalibrationProvider = { land ->
-                if (land) overlayTemporaryLandscapeCalibration else overlayTemporaryPortraitCalibration
-            },
-            onOverlayUnavailable = {
-                runOnUiThread {
-                    deactivateOverlay()
-                }
-            },
-        ).also { overlayController = it }
-
-        val hold = viewModel.sessionHold.value.takeIf { it != SessionHold.NONE } ?: SessionHold.CONNECTED
-        MirrorSessionService.start(this, deviceLabelForOverlay, hold)
-        overlayMoveToBackgroundOnAttach = moveAppToBackground
-        overlayActive = true
-        updateViewModelVisibility()
-        if (MirrorSessionService.setOverlayController(controller) &&
-            overlayMoveToBackgroundOnAttach && resumed && overlayDialogRequest == null
-        ) {
-            overlayMoveToBackgroundOnAttach = false
-            moveTaskToBack(true)
-        }
-    }
-
-    private fun deactivateOverlay() {
-        val wasActive = overlayActive
-        overlayMoveToBackgroundOnAttach = false
-        overlayController?.releaseActiveSurfaceOwnership()
-        MirrorSessionService.setOverlayController(null)
-        overlayController = null
-        overlayActive = false
-        if (wasActive) {
-            updateViewModelVisibility()
-        }
-    }
-
-    private fun bringActivityToFrontForDialog(request: OverlayDialogRequest) {
-        if (request == OverlayDialogRequest.SCREENSHOT) {
-            screenshots.captureTexture(overlayController?.activeTextureView)
-        } else if (request == OverlayDialogRequest.SHARE_SCREENSHOT) {
-            screenshots.shareCaptureTexture(overlayController?.activeTextureView)
-        } else {
-            overlayDialogRequest = request
-        }
-        val target = MirrorTarget.from(intent) ?: return
-        val bringIntent = newIntent(
-            context = this,
-            host = target.host,
-            port = target.port,
-            deviceId = target.deviceId,
-            linkOptions = target.linkOptions,
-        )
-            .setAction(ACTION_BRING_TO_FRONT)
-            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT)
-        startActivity(bringIntent)
-    }
-
     override fun onStart() {
         super.onStart()
-        activityStarted = true
-        updateViewModelVisibility()
+        viewModel.onVisibilityChanged(true)
     }
 
     override fun onResume() {
         super.onResume()
         resumed = true
         if (!isInPictureInPictureMode) restoreFullscreenTools()
-        reconcileOverlayMode()
     }
 
     override fun onPause() {
@@ -953,8 +709,7 @@ class MirrorActivity : ComponentActivity() {
 
     override fun onStop() {
         super.onStop()
-        activityStarted = false
-        updateViewModelVisibility()
+        viewModel.onVisibilityChanged(false)
         if (pipCloseArmed && !isChangingConfigurations) {
             if (pipReturnWatchdog?.isActive == true && !isFinishing) {
                 // A task return can temporarily stop the pinned Activity. Its watchdog still
@@ -996,7 +751,6 @@ class MirrorActivity : ComponentActivity() {
     override fun onSaveInstanceState(outState: Bundle) {
         outState.putParcelable(STATE_TARGET, Intent(intent))
         outState.putBoolean(STATE_EXIT_AFTER_RECORDING, exitAfterRecording)
-        outState.putBoolean(STATE_OVERLAY_REQUESTED, overlayRequested)
         outState.putBoolean(STATE_DOCUMENT_PICKER, documentPickerOpen)
         outState.putBoolean(STATE_SHARE_CHOOSER, shareChooserOpen)
         outState.putParcelable(STATE_PENDING_TARGET, pendingMirrorIntent)
@@ -1006,7 +760,6 @@ class MirrorActivity : ComponentActivity() {
     override fun onDestroy() {
         super.onDestroy()
         if (isFinishing) {
-            deactivateOverlay()
             viewModel.disconnect()
             MirrorSessionService.stop(this)
         }
@@ -1020,11 +773,9 @@ class MirrorActivity : ComponentActivity() {
         private val APP_PICKER_TYPES = arrayOf(ApkInstall.MIME_TYPE, "application/octet-stream", "application/zip",
             "application/x-zip-compressed", "application/vnd.apks", "application/vnd.apkm", "application/xapk-package-archive")
         private const val PIP_TAG = "CameraPiP"
-        private const val ACTION_BRING_TO_FRONT = "com.scrcpy.remote.BRING_MIRROR_TO_FRONT"
         private const val ACTION_RETURN_FROM_PIP = "com.scrcpy.remote.RETURN_FROM_CAMERA_PIP"
         private const val PIP_RETURN_TIMEOUT_MS = 5_000L
         private const val STATE_EXIT_AFTER_RECORDING = "mirror.exitAfterRecording"
-        private const val STATE_OVERLAY_REQUESTED = "mirror.overlayRequested"
         private const val STATE_DOCUMENT_PICKER = "mirror.documentPicker"
         private const val STATE_SHARE_CHOOSER = "mirror.shareChooser"
         private const val STATE_PENDING_TARGET = "mirror.pendingTarget"
@@ -1086,7 +837,6 @@ private fun MirrorScreen(
     viewModel: MirrorViewModel,
     repository: DeviceRepository,
     savedDeviceId: String?,
-    windowDeviceKey: String,
     screenshots: ScreenshotViewModel,
     linkRequest: LinkRequest,
     pipMode: Boolean,
@@ -1107,16 +857,6 @@ private fun MirrorScreen(
     onPickAppToInstall: () -> Unit,
     onSurfaceBound: (SurfaceView, Boolean) -> Unit,
     onLocalTypingChanged: (Boolean) -> Unit,
-    overlayActive: Boolean = false,
-    showOverlayPermissionDialog: Boolean = false,
-    onAllowOverlayPermission: () -> Unit = {},
-    onDeclineOverlayPermission: () -> Unit = {},
-    onMinimizeToOverlay: () -> Unit = {},
-    onSwitchToInApp: () -> Unit = {},
-    overlayDialogRequest: OverlayDialogRequest? = null,
-    onOverlayDialogConsumed: () -> Unit = {},
-    externalTemporaryCalibration: (Boolean) -> TouchCalibration? = { null },
-    onExternalTemporaryCalibrationChange: (Boolean, TouchCalibration?) -> Unit = { _, _ -> },
     onDisconnect: () -> Unit,
 ) {
     val state by viewModel.state.collectAsState()
@@ -1176,74 +916,11 @@ private fun MirrorScreen(
     val context = LocalContext.current
     // Resources, not the context: string lookups must follow configuration and locale changes.
     val resources = LocalResources.current
-    val density = LocalDensity.current
-    val layoutDirection = LocalLayoutDirection.current
     var viewportSize by remember { mutableStateOf(IntSize.Zero) }
     val viewportDensity = resources.displayMetrics.densityDpi
     LaunchedEffect(viewportSize, viewportDensity) {
         viewModel.updateDesktopViewport(viewportSize.width, viewportSize.height, viewportDensity)
     }
-    val windowSafeInsets = WindowInsets.safeDrawing
-    val outerMarginPx = with(density) { MIRROR_WINDOW_MARGIN.roundToPx() }
-    val topDragReservePx = with(density) { MIRROR_WINDOW_TOP_RESERVE.roundToPx() }
-    val sideBarFootprintPx = with(density) { (compactBarShortSide + ATTACHED_BAR_GAP).roundToPx() }
-    val minShortSidePx = with(density) { MIRROR_WINDOW_MIN_SHORT_SIDE.roundToPx() }
-    val safeLeft = windowSafeInsets.getLeft(density, layoutDirection) + outerMarginPx
-    val safeTop = windowSafeInsets.getTop(density) + outerMarginPx
-    val safeWindowBounds = ControlBounds(
-        left = safeLeft,
-        top = safeTop,
-        right = (viewportSize.width - windowSafeInsets.getRight(density, layoutDirection) - outerMarginPx)
-            .coerceAtLeast(safeLeft + 1),
-        bottom = (viewportSize.height - windowSafeInsets.getBottom(density) - outerMarginPx)
-            .coerceAtLeast(safeTop + 1),
-    )
-    val localLandscape = viewportSize.width > viewportSize.height
-    val remoteLandscape = landscape
-    val tabletMode = LocalConfiguration.current.smallestScreenWidthDp >= 600
-    var windowMode by rememberSaveable { mutableStateOf(MirrorWindowMode.WINDOWED) }
-    var restoreModeBeforeFullscreen by rememberSaveable { mutableStateOf(MirrorWindowMode.WINDOWED) }
-    var savedWindowFractions by remember(windowDeviceKey, localLandscape, remoteLandscape) {
-        mutableStateOf(
-            MirrorWindowPreferences.load(context, windowDeviceKey, localLandscape, remoteLandscape),
-        )
-    }
-    var liveWindowRect by remember { mutableStateOf<MirrorWindowRect?>(null) }
-    var draggingWindow by remember { mutableStateOf(false) }
-    var resizingWindow by remember { mutableStateOf(false) }
-    val isFullscreen = windowMode == MirrorWindowMode.FULLSCREEN
-    val settledWindowRect = if (connected != null && !hideSessionTools &&
-        viewportSize.width > 0 && viewportSize.height > 0
-    ) {
-        when (windowMode) {
-            MirrorWindowMode.FULLSCREEN -> computeFullscreenMirrorRect(
-                viewportWidth = viewportSize.width,
-                viewportHeight = viewportSize.height,
-                videoWidth = connected.videoWidth,
-                videoHeight = connected.videoHeight,
-            )
-            MirrorWindowMode.MAXIMIZED -> maximizeMirrorWindowRect(
-                safe = safeWindowBounds,
-                videoWidth = connected.videoWidth,
-                videoHeight = connected.videoHeight,
-                topDragReservePx = topDragReservePx,
-                minShortSidePx = minShortSidePx,
-            )
-            MirrorWindowMode.WINDOWED -> computeMirrorWindowRect(
-                safe = safeWindowBounds,
-                videoWidth = connected.videoWidth,
-                videoHeight = connected.videoHeight,
-                topDragReservePx = topDragReservePx,
-                sideBarFootprintPx = sideBarFootprintPx,
-                minShortSidePx = minShortSidePx,
-                saved = savedWindowFractions,
-                tabletMode = tabletMode,
-            )
-        }
-    } else null
-    val activeWindowRect = if (connected != null && !hideSessionTools) {
-        liveWindowRect ?: settledWindowRect
-    } else null
     var calibrationRevision by remember { mutableLongStateOf(0L) }
     var pendingCalibration by remember(savedDeviceId) {
         mutableStateOf<Map<Boolean, Pair<Long, TouchCalibration?>>>(emptyMap())
@@ -1252,9 +929,8 @@ private fun MirrorScreen(
     var temporaryPortraitY by rememberSaveable { mutableStateOf<Int?>(null) }
     var temporaryLandscapeX by rememberSaveable { mutableStateOf<Int?>(null) }
     var temporaryLandscapeY by rememberSaveable { mutableStateOf<Int?>(null) }
-    val temporary = (if (landscape) temporaryLandscapeX?.let { TouchCalibration(it, temporaryLandscapeY ?: 0) }
-        else temporaryPortraitX?.let { TouchCalibration(it, temporaryPortraitY ?: 0) })
-        ?: externalTemporaryCalibration(landscape)
+    val temporary = if (landscape) temporaryLandscapeX?.let { TouchCalibration(it, temporaryLandscapeY ?: 0) }
+        else temporaryPortraitX?.let { TouchCalibration(it, temporaryPortraitY ?: 0) }
     val persistedCalibration = if (savedDevice != null) {
         if (landscape) savedDevice.landscapeCalibration else savedDevice.portraitCalibration
     } else temporary
@@ -1268,13 +944,7 @@ private fun MirrorScreen(
     var showDiagnostics by rememberSaveable { mutableStateOf(false) }
     var showDetails by rememberSaveable { mutableStateOf(false) }
     var geometry by remember { mutableStateOf<VideoLayout?>(null) }
-    // Local tablet zoom level & gesture lock. Preserved across tablet rotation (rememberSaveable)
-    // and reset cleanly only when the remote stream session/capture generation changes.
     var viewZoom by rememberSaveable { mutableFloatStateOf(1f) }
-    var lastZoomSessionGen by rememberSaveable { mutableLongStateOf(-1L) }
-    var lastZoomCaptureGen by rememberSaveable { mutableLongStateOf(-1L) }
-    var localZoomMode by rememberSaveable { mutableStateOf(false) }
-    var mirrorViewRef by remember { mutableStateOf<ScrcpyMirrorView?>(null) }
     // Precision pad mode for this target, kept across recreation like the session's other
     // controls. Its speed is about this phone's user rather than the device, so it outlives the
     // session; see PrecisionPadPreferences.
@@ -1336,7 +1006,6 @@ private fun MirrorScreen(
             }
         }
         else {
-            onExternalTemporaryCalibrationChange(landscape, value)
             if (landscape) {
                 temporaryLandscapeX = value?.xDp
                 temporaryLandscapeY = value?.yDp
@@ -1347,44 +1016,11 @@ private fun MirrorScreen(
         }
     }
 
-    LaunchedEffect(overlayDialogRequest, fullscreenToolsAvailable) {
-        val request = overlayDialogRequest ?: return@LaunchedEffect
-        if (!canUseSessionTools()) return@LaunchedEffect
-        onOverlayDialogConsumed()
-        when (request) {
-            OverlayDialogRequest.APPS -> showApps = true
-            OverlayDialogRequest.ENCODERS -> showEncoders = true
-            OverlayDialogRequest.DISPLAYS -> showDisplays = true
-            OverlayDialogRequest.CAMERAS -> showCameras = true
-            OverlayDialogRequest.DEVICE_SETTINGS -> if (savedDevice != null) showDeviceSettings = true
-            OverlayDialogRequest.DETAILS -> showDetails = true
-            OverlayDialogRequest.STREAM_CHOICES -> showStreamChoices = true
-            OverlayDialogRequest.APPLY_SETTINGS -> confirmApplySettings = true
-            OverlayDialogRequest.SEND_FILE -> onPickFileToSend()
-            OverlayDialogRequest.RECORD_SOUND_CHOICE -> {
-                val sound = viewModel.recordingSound()
-                if (sound is RecordingSound.NeedsAac) soundChoice = sound.codec
-            }
-            OverlayDialogRequest.FINISHED_RECORDING -> Unit
-            OverlayDialogRequest.SCREENSHOT, OverlayDialogRequest.SHARE_SCREENSHOT -> Unit
-        }
-    }
-
     LaunchedEffect(showDiagnostics, hideSessionTools) {
         viewModel.diagnosticsEnabled = showDiagnostics && !hideSessionTools
     }
-    // Reset local zoom only when a reconnect or remote capture change reflows the video stream,
-    // while preserving the user's current zoom level smoothly across tablet orientation changes.
-    LaunchedEffect(connected?.sessionGeneration, connected?.captureGeneration) {
-        val currentSession = connected ?: return@LaunchedEffect
-        if (lastZoomSessionGen != -1L &&
-            (lastZoomSessionGen != currentSession.sessionGeneration ||
-                lastZoomCaptureGen != currentSession.captureGeneration)
-        ) {
-            viewZoom = 1f
-        }
-        lastZoomSessionGen = currentSession.sessionGeneration
-        lastZoomCaptureGen = currentSession.captureGeneration
+    LaunchedEffect(connected == null) {
+        if (connected == null) viewZoom = 1f
     }
     LaunchedEffect(notice, hideSessionTools) {
         if (!hideSessionTools) notice?.let { snackbar.showSnackbar(it); viewModel.clearNotice() }
@@ -1416,13 +1052,7 @@ private fun MirrorScreen(
         }
     }
     BackHandler(enabled = !hideSessionTools) {
-        if (isFullscreen && state is MirrorUiState.Connected) {
-            windowMode = restoreModeBeforeFullscreen
-        } else if (state is MirrorUiState.Connected) {
-            confirmLeave = true
-        } else {
-            onDisconnect()
-        }
+        if (state is MirrorUiState.Connected) confirmLeave = true else onDisconnect()
     }
     if (showDiagnosis && state is MirrorUiState.Failed) failureReport?.let { report ->
         ConnectionDiagnosisDialog(
@@ -1475,164 +1105,30 @@ private fun MirrorScreen(
 
             is MirrorUiState.Connected -> if (hideSessionTools && activeSettings?.camera == null) {
                 CameraPipStatus(R.string.camera_pip_failed)
-            } else if (overlayActive) {
-                OverlayRunningStatus(
-                    onMinimizeToOverlay = onMinimizeToOverlay,
-                    onSwitchToInApp = onSwitchToInApp,
-                    onDisconnect = { confirmLeave = true },
-                )
             } else {
-                val windowCornerRadiusPx = if (activeWindowRect != null && !isFullscreen) {
-                    val minSide = minOf(activeWindowRect.width, activeWindowRect.height).toFloat()
-                    (minSide * 0.095f).coerceIn(
-                        with(density) { MIRROR_WINDOW_MIN_CORNER_RADIUS.toPx() },
-                        with(density) { MIRROR_WINDOW_MAX_CORNER_RADIUS.toPx() },
+                key(current.sessionGeneration) {
+                    MirrorSurface(
+                        viewModel = viewModel,
+                        state = current,
+                        settings = settings,
+                        cameraSession = activeSettings?.camera != null,
+                        inputState = inputState,
+                        zoom = viewZoom,
+                        onGeometryChanged = { geometry = it },
+                        onSurfaceBound = onSurfaceBound,
+                        precisionPad = padActive,
+                        padSpeed = padSpeed,
+                        padHandle = padHandle,
+                        hiddenFromAccessibility = controlsModal,
                     )
-                } else 0f
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = if (activeWindowRect != null) AbsoluteAlignment.TopLeft else Alignment.Center,
-                ) {
-                    val surfaceContainerModifier = if (activeWindowRect != null) {
-                        Modifier
-                            .absoluteOffset { IntOffset(activeWindowRect.left, activeWindowRect.top) }
-                            .requiredSize(
-                                with(density) { activeWindowRect.width.toDp() },
-                                with(density) { activeWindowRect.height.toDp() },
-                            )
-                    } else {
-                        Modifier.fillMaxSize()
-                    }
-                    Box(surfaceContainerModifier) {
-                        key(current.sessionGeneration) {
-                            MirrorSurface(
-                                viewModel = viewModel,
-                                state = current,
-                                settings = settings,
-                                cameraSession = activeSettings?.camera != null,
-                                inputState = inputState,
-                                zoom = viewZoom,
-                                localZoomMode = localZoomMode,
-                                cornerRadiusPx = windowCornerRadiusPx,
-                                onGeometryChanged = { geometry = it },
-                                onZoomChanged = { viewZoom = it },
-                                onViewReady = { mirrorViewRef = it },
-                                onSurfaceBound = onSurfaceBound,
-                                precisionPad = padActive,
-                                padSpeed = padSpeed,
-                                padHandle = padHandle,
-                                hiddenFromAccessibility = controlsModal,
-                            )
-                        }
-                        if (activeWindowRect != null && !isFullscreen) {
-                            MirrorWindowChrome(
-                                cornerRadiusPx = windowCornerRadiusPx,
-                                active = draggingWindow || resizingWindow,
-                                modifier = Modifier.matchParentSize(),
-                            )
-                        }
-                    }
-                    if (activeWindowRect != null && !isFullscreen && !inputState.locked) {
-                        val latestSafe by rememberUpdatedState(safeWindowBounds)
-                        val latestWindow by rememberUpdatedState(activeWindowRect)
-                        val latestVideoW by rememberUpdatedState(current.videoWidth)
-                        val latestVideoH by rememberUpdatedState(current.videoHeight)
-                        val latestLocalLand by rememberUpdatedState(localLandscape)
-                        val latestRemoteLand by rememberUpdatedState(remoteLandscape)
-                        fun persistWindow(rect: MirrorWindowRect) {
-                            val next = mirrorWindowToFractions(
-                                rect = rect,
-                                safe = latestSafe,
-                                videoWidth = latestVideoW,
-                                videoHeight = latestVideoH,
-                                topDragReservePx = topDragReservePx,
-                            )
-                            savedWindowFractions = next
-                            MirrorWindowPreferences.save(
-                                context,
-                                windowDeviceKey,
-                                latestLocalLand,
-                                latestRemoteLand,
-                                next,
-                            )
-                        }
-                        MirrorWindowTopDragBar(
-                            windowRect = activeWindowRect,
-                            active = draggingWindow,
-                            onDragStart = {
-                                if (windowMode == MirrorWindowMode.MAXIMIZED) {
-                                    windowMode = MirrorWindowMode.WINDOWED
-                                }
-                                draggingWindow = true
-                                liveWindowRect = latestWindow
-                                latestWindow
-                            },
-                            onDrag = { startRect, totalDx, totalDy ->
-                                liveWindowRect = dragMirrorWindow(
-                                    current = startRect,
-                                    deltaX = totalDx,
-                                    deltaY = totalDy,
-                                    safe = latestSafe,
-                                    topDragReservePx = topDragReservePx,
-                                )
-                            },
-                            onDragEnd = {
-                                draggingWindow = false
-                                liveWindowRect?.let(::persistWindow)
-                                liveWindowRect = null
-                            },
-                            onDoubleTap = {
-                                restoreModeBeforeFullscreen = windowMode
-                                windowMode = MirrorWindowMode.FULLSCREEN
-                            },
-                        )
-                        MirrorWindowCornerResizeHandle(
-                            windowRect = activeWindowRect,
-                            viewportSize = viewportSize,
-                            cornerRadiusPx = windowCornerRadiusPx,
-                            active = resizingWindow,
-                            onResizeStart = {
-                                if (windowMode == MirrorWindowMode.MAXIMIZED) {
-                                    windowMode = MirrorWindowMode.WINDOWED
-                                }
-                                resizingWindow = true
-                                liveWindowRect = latestWindow
-                                latestWindow
-                            },
-                            onResize = { startRect, totalDx, totalDy ->
-                                liveWindowRect = resizeMirrorWindowFromCorner(
-                                    start = startRect,
-                                    totalDeltaX = totalDx,
-                                    totalDeltaY = totalDy,
-                                    safe = latestSafe,
-                                    videoWidth = latestVideoW,
-                                    videoHeight = latestVideoH,
-                                    topDragReservePx = topDragReservePx,
-                                    minShortSidePx = minShortSidePx,
-                                )
-                            },
-                            onResizeEnd = {
-                                resizingWindow = false
-                                liveWindowRect?.let(::persistWindow)
-                                liveWindowRect = null
-                            },
-                        )
-                    }
                 }
             }
         }
 
-        if (connected != null && !hideSessionTools && !overlayActive) {
+        if (connected != null && !hideSessionTools) {
             MirrorStatsChip(viewModel)
             if (showDiagnostics) {
-                MirrorDiagnostics(
-                    viewModel = viewModel,
-                    layout = geometry,
-                    videoWidth = connected.videoWidth,
-                    videoHeight = connected.videoHeight,
-                    videoOffsetX = (activeWindowRect?.left ?: 0).toFloat(),
-                    videoOffsetY = (activeWindowRect?.top ?: 0).toFloat(),
-                )
+                MirrorDiagnostics(viewModel, geometry, connected.videoWidth, connected.videoHeight)
             }
 
             // Under the floating controls, so opening them covers it; locked, the lock banner
@@ -1650,49 +1146,6 @@ private fun MirrorScreen(
                             PrecisionPadPreferences.saveSpeed(context, it)
                         },
                         onExit = { precisionPad = false },
-                    )
-                }
-            }
-
-            if (!padActive && !inputState.locked && !controlsModal) {
-                ScrcpyRemoteTheme(darkTheme = true) {
-                    MirrorControlStrip(
-                        zoom = viewZoom,
-                        localZoomMode = localZoomMode,
-                        windowMode = windowMode,
-                        onZoomIn = {
-                            val target = (viewZoom * 2f).coerceAtMost(VideoLayout.MAX_ZOOM)
-                            mirrorViewRef?.animateZoomTo(target) ?: run { viewZoom = target }
-                        },
-                        onZoomOut = {
-                            val target = (viewZoom / 2f).coerceAtLeast(1f)
-                            mirrorViewRef?.animateZoomTo(target) ?: run { viewZoom = target }
-                        },
-                        onResetZoom = {
-                            mirrorViewRef?.animateZoomTo(1f) ?: run { viewZoom = 1f }
-                        },
-                        onFitToScreen = {
-                            mirrorViewRef?.animateZoomTo(1f) ?: run { viewZoom = 1f }
-                        },
-                        onToggleLocalZoomMode = { localZoomMode = !localZoomMode },
-                        onToggleMaximize = {
-                            liveWindowRect = null
-                            windowMode = if (windowMode == MirrorWindowMode.MAXIMIZED) {
-                                MirrorWindowMode.WINDOWED
-                            } else {
-                                MirrorWindowMode.MAXIMIZED
-                            }
-                        },
-                        onToggleFullscreen = {
-                            liveWindowRect = null
-                            if (windowMode == MirrorWindowMode.FULLSCREEN) {
-                                windowMode = restoreModeBeforeFullscreen
-                            } else {
-                                restoreModeBeforeFullscreen = windowMode
-                                windowMode = MirrorWindowMode.FULLSCREEN
-                            }
-                        },
-                        onDisconnect = { confirmLeave = true },
                     )
                 }
             }
@@ -1751,17 +1204,9 @@ private fun MirrorScreen(
                     // Steps rather than a continuous control: the panel is a list of buttons, and
                     // a step that doubles reaches the useful range in three presses.
                     viewZoom = viewZoom,
-                    onViewZoomIn = {
-                        val target = (viewZoom * 2f).coerceAtMost(VideoLayout.MAX_ZOOM)
-                        mirrorViewRef?.animateZoomTo(target) ?: run { viewZoom = target }
-                    },
-                    onViewZoomOut = {
-                        val target = (viewZoom / 2f).coerceAtLeast(1f)
-                        mirrorViewRef?.animateZoomTo(target) ?: run { viewZoom = target }
-                    },
-                    onViewZoomReset = {
-                        mirrorViewRef?.animateZoomTo(1f) ?: run { viewZoom = 1f }
-                    },
+                    onViewZoomIn = { viewZoom = (viewZoom * 2f).coerceAtMost(VideoLayout.MAX_ZOOM) },
+                    onViewZoomOut = { viewZoom = (viewZoom / 2f).coerceAtLeast(1f) },
+                    onViewZoomReset = { viewZoom = 1f },
                     onShareScreenshot = onRequestShareScreenshot,
                     onCameraPip = if (pipSupported && activeSettings?.camera != null)
                         onRequestCameraPip else null,
@@ -1782,7 +1227,6 @@ private fun MirrorScreen(
                 },
                 inputLockBanner = lockBanner,
                 onPanelModalChanged = { controlsModal = it },
-                attachedWindow = if (isFullscreen) null else activeWindowRect?.toControlBounds(),
             )
         }
         if (connected == null && inputState.locked && !hideSessionTools) {
@@ -2197,62 +1641,6 @@ private fun MirrorScreen(
             },
         )
     }
-    if (showOverlayPermissionDialog) {
-        AlertDialog(
-            onDismissRequest = onDeclineOverlayPermission,
-            title = { Text(stringResource(R.string.overlay_permission_title)) },
-            text = { Text(stringResource(R.string.overlay_permission_body)) },
-            confirmButton = {
-                Button(onClick = onAllowOverlayPermission) {
-                    Text(stringResource(R.string.overlay_permission_allow))
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = onDeclineOverlayPermission) {
-                    Text(stringResource(R.string.overlay_permission_fallback))
-                }
-            },
-        )
-    }
-}
-
-@Composable
-private fun OverlayRunningStatus(
-    onMinimizeToOverlay: () -> Unit,
-    onSwitchToInApp: () -> Unit,
-    onDisconnect: () -> Unit,
-) {
-    Column(
-        modifier = Modifier
-            .background(MaterialTheme.colorScheme.surface)
-            .padding(24.dp)
-            .testTag("overlay-running-status"),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        Text(
-            stringResource(R.string.overlay_active_title),
-            color = MaterialTheme.colorScheme.onSurface,
-            style = MaterialTheme.typography.titleMedium,
-            textAlign = TextAlign.Center,
-        )
-        Text(
-            stringResource(R.string.overlay_active_body),
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            style = MaterialTheme.typography.bodyMedium,
-            textAlign = TextAlign.Center,
-        )
-        Spacer(Modifier.height(4.dp))
-        Button(onClick = onMinimizeToOverlay) {
-            Text(stringResource(R.string.overlay_hide_app))
-        }
-        TextButton(onClick = onSwitchToInApp) {
-            Text(stringResource(R.string.overlay_switch_in_app))
-        }
-        TextButton(onClick = onDisconnect) {
-            Text(stringResource(R.string.exit))
-        }
-    }
 }
 
 @Composable
@@ -2291,22 +1679,12 @@ private fun MirrorDiagnostics(
     layout: VideoLayout?,
     videoWidth: Int,
     videoHeight: Int,
-    videoOffsetX: Float = 0f,
-    videoOffsetY: Float = 0f,
 ) {
     val diagnostics by viewModel.diagnostics.collectAsState()
     val timing by viewModel.mediaTiming.collectAsState()
     val frames by viewModel.videoFrames.collectAsState()
-    TouchDiagnosticsOverlay(
-        diagnostics = diagnostics,
-        layout = layout,
-        videoWidth = videoWidth,
-        videoHeight = videoHeight,
-        timing = timing,
-        video = frames,
-        videoOffsetX = videoOffsetX,
-        videoOffsetY = videoOffsetY,
-    )
+    TouchDiagnosticsOverlay(diagnostics, layout, videoWidth, videoHeight,
+        timing = timing, video = frames)
 }
 
 /** The live stats line, top-centre; reads its own flows so the screen root is not invalidated. */
@@ -2456,216 +1834,6 @@ internal fun rememberMirrorActions(    viewModel: MirrorViewModel,
 )
 }
 
-private val MIRROR_WINDOW_MARGIN = 8.dp
-private val MIRROR_WINDOW_TOP_RESERVE = 26.dp
-private val MIRROR_WINDOW_MIN_SHORT_SIDE = 140.dp
-private val MIRROR_WINDOW_MIN_CORNER_RADIUS = 18.dp
-private val MIRROR_WINDOW_MAX_CORNER_RADIUS = 32.dp
-private val MIRROR_WINDOW_RESIZE_HIT_SIZE = 38.dp
-
-/**
- * Masks outer corners over hardware surfaces on older API levels and draws the subtle hairline
- * bezel border around the rounded phone window.
- */
-@Composable
-private fun MirrorWindowChrome(
-    cornerRadiusPx: Float,
-    active: Boolean,
-    modifier: Modifier = Modifier,
-) {
-    val maskPath = remember { Path() }
-    Canvas(modifier) {
-        val radius = cornerRadiusPx.coerceAtMost(minOf(size.width, size.height) / 2f)
-        maskPath.reset()
-        maskPath.fillType = PathFillType.EvenOdd
-        maskPath.addRect(androidx.compose.ui.geometry.Rect(0f, 0f, size.width, size.height))
-        maskPath.addRoundRect(
-            RoundRect(
-                left = 0f,
-                top = 0f,
-                right = size.width,
-                bottom = size.height,
-                cornerRadius = CornerRadius(radius, radius),
-            ),
-        )
-        drawPath(maskPath, Color.Black)
-        val strokeWidth = 1.dp.toPx()
-        val halfStroke = strokeWidth / 2f
-        val borderRadius = (radius - halfStroke).coerceAtLeast(0f)
-        drawRoundRect(
-            color = Color.White.copy(alpha = if (active) 0.42f else 0.22f),
-            topLeft = Offset(halfStroke, halfStroke),
-            size = Size((size.width - strokeWidth).coerceAtLeast(0f), (size.height - strokeWidth).coerceAtLeast(0f)),
-            cornerRadius = CornerRadius(borderRadius, borderRadius),
-            style = Stroke(width = strokeWidth),
-        )
-    }
-}
-
-@Composable
-private fun MirrorWindowTopDragBar(
-    windowRect: MirrorWindowRect,
-    active: Boolean,
-    onDragStart: () -> MirrorWindowRect,
-    onDrag: (MirrorWindowRect, Float, Float) -> Unit,
-    onDragEnd: () -> Unit,
-    onDoubleTap: () -> Unit = {},
-) {
-    val density = LocalDensity.current
-    val hitHeightPx = with(density) { MIRROR_WINDOW_TOP_RESERVE.roundToPx() }
-    val hitWidthPx = (windowRect.width * 0.5f)
-        .roundToInt()
-        .coerceIn(
-            minOf(windowRect.width, with(density) { 84.dp.roundToPx() }),
-            maxOf(windowRect.width.coerceAtLeast(1), with(density) { 160.dp.roundToPx() }),
-        )
-        .coerceAtMost(windowRect.width.coerceAtLeast(1))
-    val left = windowRect.left + (windowRect.width - hitWidthPx) / 2
-    val top = (windowRect.top - hitHeightPx).coerceAtLeast(0)
-    val label = stringResource(R.string.mirror_window_drag_handle)
-    var nodePosInRoot by remember { mutableStateOf(Offset.Zero) }
-    val latestOnDragStart by rememberUpdatedState(onDragStart)
-    val latestOnDrag by rememberUpdatedState(onDrag)
-    val latestOnDragEnd by rememberUpdatedState(onDragEnd)
-    val latestOnDoubleTap by rememberUpdatedState(onDoubleTap)
-
-    Box(
-        modifier = Modifier
-            .absoluteOffset { IntOffset(left, top) }
-            .size(with(density) { hitWidthPx.toDp() }, MIRROR_WINDOW_TOP_RESERVE)
-            .onPlaced { nodePosInRoot = it.positionInRoot() }
-            .testTag("mirror-window-drag-bar")
-            .semantics { contentDescription = label }
-            .pointerInput(Unit) {
-                detectTapGestures(onDoubleTap = { latestOnDoubleTap() })
-            }
-            .pointerInput(Unit) {
-                var startRect: MirrorWindowRect? = null
-                var startFingerRoot = Offset.Zero
-                detectDragGestures(
-                    onDragStart = { localOffset ->
-                        startFingerRoot = nodePosInRoot + localOffset
-                        startRect = latestOnDragStart()
-                    },
-                    onDragEnd = {
-                        startRect = null
-                        latestOnDragEnd()
-                    },
-                    onDragCancel = {
-                        startRect = null
-                        latestOnDragEnd()
-                    },
-                ) { change, _ ->
-                    change.consume()
-                    val origin = startRect ?: return@detectDragGestures
-                    val currentFingerRoot = nodePosInRoot + change.position
-                    latestOnDrag(
-                        origin,
-                        currentFingerRoot.x - startFingerRoot.x,
-                        currentFingerRoot.y - startFingerRoot.y,
-                    )
-                }
-            },
-        contentAlignment = Alignment.Center,
-    ) {
-        val pillWidthDp = with(density) { (hitWidthPx * 0.85f).roundToInt().toDp() }.coerceAtLeast(56.dp)
-        Canvas(Modifier.size(pillWidthDp, 16.dp)) {
-            drawRoundRect(
-                color = Color(0xFF1C1C20).copy(alpha = 0.92f),
-                cornerRadius = CornerRadius(size.height / 2f, size.height / 2f),
-            )
-            drawRoundRect(
-                color = Color.White.copy(alpha = if (active) 0.42f else 0.18f),
-                cornerRadius = CornerRadius(size.height / 2f, size.height / 2f),
-                style = Stroke(width = 1.dp.toPx()),
-            )
-            val grabW = (size.width * 0.42f).coerceIn(24.dp.toPx(), 44.dp.toPx())
-            val grabH = 3.5.dp.toPx()
-            drawRoundRect(
-                color = Color.White.copy(alpha = if (active) 0.88f else 0.54f),
-                topLeft = Offset((size.width - grabW) / 2f, (size.height - grabH) / 2f),
-                size = Size(grabW, grabH),
-                cornerRadius = CornerRadius(grabH / 2f, grabH / 2f),
-            )
-        }
-    }
-}
-
-@Composable
-private fun MirrorWindowCornerResizeHandle(
-    windowRect: MirrorWindowRect,
-    viewportSize: IntSize,
-    cornerRadiusPx: Float,
-    active: Boolean,
-    onResizeStart: () -> MirrorWindowRect,
-    onResize: (MirrorWindowRect, Float, Float) -> Unit,
-    onResizeEnd: () -> Unit,
-) {
-    val density = LocalDensity.current
-    val hitSizePx = with(density) { MIRROR_WINDOW_RESIZE_HIT_SIZE.roundToPx() }
-    val overhangPx = with(density) { 14.dp.roundToPx() }
-    val maxLeft = (viewportSize.width - hitSizePx).coerceAtLeast(0)
-    val maxTop = (viewportSize.height - hitSizePx).coerceAtLeast(0)
-    val left = (windowRect.right + overhangPx - hitSizePx).coerceIn(0, maxLeft)
-    val top = (windowRect.bottom + overhangPx - hitSizePx).coerceIn(0, maxTop)
-    val label = stringResource(R.string.mirror_window_resize_handle)
-    var nodePosInRoot by remember { mutableStateOf(Offset.Zero) }
-    val latestOnResizeStart by rememberUpdatedState(onResizeStart)
-    val latestOnResize by rememberUpdatedState(onResize)
-    val latestOnResizeEnd by rememberUpdatedState(onResizeEnd)
-
-    Box(
-        modifier = Modifier
-            .absoluteOffset { IntOffset(left, top) }
-            .size(MIRROR_WINDOW_RESIZE_HIT_SIZE)
-            .onPlaced { nodePosInRoot = it.positionInRoot() }
-            .testTag("mirror-window-resize-handle")
-            .semantics { contentDescription = label }
-            .pointerInput(Unit) {
-                var startRect: MirrorWindowRect? = null
-                var startFingerRoot = Offset.Zero
-                detectDragGestures(
-                    onDragStart = { localOffset ->
-                        startFingerRoot = nodePosInRoot + localOffset
-                        startRect = latestOnResizeStart()
-                    },
-                    onDragEnd = {
-                        startRect = null
-                        latestOnResizeEnd()
-                    },
-                    onDragCancel = {
-                        startRect = null
-                        latestOnResizeEnd()
-                    },
-                ) { change, _ ->
-                    change.consume()
-                    val origin = startRect ?: return@detectDragGestures
-                    val currentFingerRoot = nodePosInRoot + change.position
-                    latestOnResize(
-                        origin,
-                        currentFingerRoot.x - startFingerRoot.x,
-                        currentFingerRoot.y - startFingerRoot.y,
-                    )
-                }
-            },
-    ) {
-        Canvas(Modifier.fillMaxSize()) {
-            val arcRadius = (cornerRadiusPx + 3.dp.toPx()).coerceIn(14.dp.toPx(), 34.dp.toPx())
-            val cornerCenterX = (windowRect.right - left) - cornerRadiusPx
-            val cornerCenterY = (windowRect.bottom - top) - cornerRadiusPx
-            drawArc(
-                color = Color.White.copy(alpha = if (active) 0.92f else 0.56f),
-                startAngle = 12f,
-                sweepAngle = 66f,
-                useCenter = false,
-                topLeft = Offset(cornerCenterX - arcRadius, cornerCenterY - arcRadius),
-                size = Size(arcRadius * 2f, arcRadius * 2f),
-                style = Stroke(width = 2.5.dp.toPx(), cap = StrokeCap.Round),
-            )
-        }
-    }
-}
-
 @Composable
 private fun MirrorSurface(
     viewModel: MirrorViewModel,
@@ -2674,11 +1842,7 @@ private fun MirrorSurface(
     cameraSession: Boolean,
     inputState: com.scrcpy.remote.session.SessionInputState,
     zoom: Float,
-    localZoomMode: Boolean = false,
-    cornerRadiusPx: Float = 0f,
     onGeometryChanged: (VideoLayout) -> Unit,
-    onZoomChanged: (Float) -> Unit = {},
-    onViewReady: (ScrcpyMirrorView?) -> Unit = {},
     onSurfaceBound: (SurfaceView, Boolean) -> Unit,
     precisionPad: Boolean,
     padSpeed: Float,
@@ -2686,8 +1850,6 @@ private fun MirrorSurface(
     hiddenFromAccessibility: Boolean,
 ) {
     val density = LocalDensity.current
-    val latestOnZoomChanged by rememberUpdatedState(onZoomChanged)
-    val latestOnViewReady by rememberUpdatedState(onViewReady)
     val label = stringResource(
         if (inputState.locked) R.string.input_locked_surface_description
         else if (cameraSession) R.string.camera_surface_description
@@ -2704,9 +1866,7 @@ private fun MirrorSurface(
             ScrcpyMirrorView(context).apply {
                 onSurfaceBound(this.screenshotSurface, true)
                 padHandle.view = this
-                latestOnViewReady(this)
                 onPrecisionPadChanged = { dragging, _, cursorY -> padHandle.update(dragging, cursorY) }
-                this.onZoomChanged = { updatedZoom -> post { latestOnZoomChanged(updatedZoom) } }
                 onTouch = { action, pointerId, x, y, pressure, srcW, srcH, rawX, rawY ->
                     viewModel.sendTouch(action, pointerId, x, y, pressure, srcW, srcH, rawX, rawY,
                         state.sessionGeneration, captureGeneration, this.inputState.generation)
@@ -2734,19 +1894,14 @@ private fun MirrorSurface(
             }
         },
         update = { view ->
-            latestOnViewReady(view)
             view.setInputState(inputState)
             view.applyTouchCalibration(
                 with(density) { settings.touchOffsetXDp.dp.toPx() },
                 with(density) { settings.touchOffsetYDp.dp.toPx() },
             )
             view.captureEdgeGestures = settings.captureEdgeGestures
-            view.localZoomMode = localZoomMode
-            view.cornerRadiusPx = cornerRadiusPx
             view.setVideoSize(state.videoWidth, state.videoHeight, state.captureGeneration)
-            if (!view.isZoomAnimating && !view.isZoomGestureActive && abs(view.zoom - zoom) > 0.001f) {
-                view.setZoom(zoom)
-            }
+            view.setZoom(zoom)
             view.precisionPadSpeed = padSpeed
             view.precisionPad = precisionPad
             // The view's own node as well as the Compose one around it.
@@ -2758,8 +1913,6 @@ private fun MirrorSurface(
             view.releaseAllPointers()
             view.onGeometryChanged = null
             view.onPrecisionPadChanged = null
-            view.onZoomChanged = null
-            latestOnViewReady(null)
             if (padHandle.view === view) padHandle.view = null
             onSurfaceBound(view.screenshotSurface, false)
         },

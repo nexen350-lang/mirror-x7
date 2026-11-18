@@ -90,26 +90,4 @@
     <string name="error_details_show">التفاصيل</string>
     <string name="error_details_hide">إخفاء التفاصيل</string>
     <string name="error_detail">التفاصيل: %1$s</string>
-    <string name="mirror_window_drag_handle">تحريك نافذة العرض</string>
-    <string name="mirror_window_resize_handle">تغيير حجم نافذة العرض</string>
-    <string name="overlay_permission_title">نافذة عرض عائمة</string>
-    <string name="overlay_permission_body">اسمح بصلاحية «العرض فوق التطبيقات الأخرى» لإظهار شاشة الهاتف في نافذة عائمة مستقلة فوق الشاشة الرئيسية وباقي التطبيقات.\n\nإذا رفضت أو كانت الصلاحية غير مفعلة، سيكمل العرض داخل التطبيق بشكل طبيعي.</string>
-    <string name="overlay_permission_allow">منح الصلاحية</string>
-    <string name="overlay_permission_fallback">البقاء داخل التطبيق</string>
-    <string name="overlay_permission_unavailable">تعذر فتح إعدادات الصلاحية؛ سيستمر العرض داخل التطبيق.</string>
-    <string name="overlay_active_title">شاشة الهاتف تعمل في النافذة العائمة</string>
-    <string name="overlay_active_body">نافذة الهاتف متاحة الآن فوق التطبيقات ويمكنك تحريكها وتكبيرها وتصغيرها بحرية.</string>
-    <string name="overlay_hide_app">العودة للخلفية</string>
-    <string name="overlay_switch_in_app">العرض داخل التطبيق</string>
-    <string name="mirror_control_zoom_in">تكبير العرض</string>
-    <string name="mirror_control_zoom_out">تصغير العرض</string>
-    <string name="mirror_control_reset_zoom">إعادة تعيين التكبير (%1$.1f×)</string>
-    <string name="mirror_control_fit_screen">ملاءمة للشاشة</string>
-    <string name="mirror_control_pan_mode">وضع التحريك والتكبير</string>
-    <string name="mirror_control_maximize">تكبير النافذة</string>
-    <string name="mirror_control_restore_window">استعادة حجم النافذة</string>
-    <string name="mirror_control_fullscreen">ملء الشاشة</string>
-    <string name="mirror_control_exit_fullscreen">الخروج من ملء الشاشة</string>
-    <string name="mirror_control_disconnect">قطع الاتصال</string>
-    <string name="mirror_control_wake_strip">إظهار أدوات العرض</string>
 </resources>

@@ -1,36 +1,25 @@
 package com.scrcpy.remote.ui
 
-import android.animation.ValueAnimator
 import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Color
-import android.graphics.Outline
 import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.Rect
-import android.graphics.SurfaceTexture
 import android.os.Build
 import android.util.AttributeSet
 import android.view.InputDevice
-import android.view.KeyEvent
 import android.view.MotionEvent
-import android.view.Surface
 import android.view.SurfaceHolder
 import android.view.SurfaceView
-import android.view.TextureView
-import android.view.View
 import android.view.ViewConfiguration
 import android.view.ViewGroup
-import android.view.ViewOutlineProvider
-import android.view.animation.DecelerateInterpolator
 import androidx.core.graphics.withTranslation
 import com.scrcpy.remote.scrcpy.ControlMessage
 import com.scrcpy.remote.session.MirrorViewModel
 import com.scrcpy.remote.session.MouseButtonPolicy
 import com.scrcpy.remote.session.SessionInputState
-import kotlin.math.abs
-import kotlin.math.hypot
 
 /**
  * Renders the mirrored screen and forwards touches to it.
@@ -47,19 +36,9 @@ import kotlin.math.hypot
 class ScrcpyMirrorView @JvmOverloads constructor(
     context: Context,
     attrs: AttributeSet? = null,
-    useTextureView: Boolean = false,
 ) : ViewGroup(context, attrs) {
 
-    private val surfaceView: SurfaceView? = if (useTextureView) null else SurfaceView(context)
-    private val textureView: TextureView? = if (useTextureView) {
-        TextureView(context).apply { isOpaque = false }
-    } else null
-    private val renderView: View get() = textureView ?: requireNotNull(surfaceView)
-    private var activeTextureSurface: Surface? = null
-
-    /** Callback for overlay TextureView mode when the rendering surface is ready or released. */
-    var onTextureSurfaceAvailable: ((Surface) -> Unit)? = null
-    var onTextureSurfaceDestroyed: (() -> Unit)? = null
+    private val surfaceView = SurfaceView(context)
 
     /** Invoked with (action, pointerId, deviceX, deviceY, pressure, videoWidth, videoHeight, rawX, rawY). */
     var onTouch: ((Int, Long, Int, Int, Float, Int, Int, Float, Float) -> Unit)? = null
@@ -79,20 +58,14 @@ class ScrcpyMirrorView @JvmOverloads constructor(
         if (value == inputState) return
         releaseAllPointers()
         inputState = value
-        resetLocalGestureTracking()
+        panning = false
+        gestureStarted = false
         suppressedMouseGesture = false
         updateGestureExclusion()
         padChanged()
     }
 
-    private val viewConfig = ViewConfiguration.get(context)
     private val density = resources.displayMetrics.density
-    private val scaledTouchSlop = viewConfig.scaledTouchSlop.toFloat()
-    private val scaledDoubleTapSlop = viewConfig.scaledDoubleTapSlop.toFloat()
-    private val pinchSlopPx = maxOf(scaledTouchSlop * 2f, PINCH_SLOP_DP * density)
-    private val minPinchSpanPx = MIN_PINCH_SPAN_DP * density
-    private val doubleTapTimeoutMs = ViewConfiguration.getDoubleTapTimeout().toLong()
-    private val tapTimeoutMs = ViewConfiguration.getTapTimeout().toLong().coerceAtLeast(180L)
 
     /**
      * The precision pad's cursor, presses and scrolls. Everything it sends goes out through
@@ -125,21 +98,10 @@ class ScrcpyMirrorView @JvmOverloads constructor(
             // A gesture already under way belongs to the mode it began in. The rest of it is
             // dropped rather than reinterpreted, and whatever either mode was holding is let go.
             releaseAllPointers()
-            resetLocalGestureTracking()
+            panning = false
+            gestureStarted = false
             suppressedMouseGesture = false
             padChanged()
-        }
-
-    /**
-     * When true, single-finger drags pan a zoomed screen and single-finger double-taps toggle
-     * Fit/Zoom without forwarding touches to the remote device. Two-finger pinch/pan always works.
-     */
-    var localZoomMode: Boolean = false
-        set(value) {
-            if (field == value) return
-            field = value
-            releaseDirectPointers()
-            resetLocalGestureTracking()
         }
 
     /** Cursor travel on screen per unit of finger travel; one of [PrecisionPad.SPEEDS]. */
@@ -177,9 +139,8 @@ class ScrcpyMirrorView @JvmOverloads constructor(
     /** Exposes the rectangle the surface occupies so a diagnostic overlay can invert the mapping. */
     val contentRect: VideoLayout? get() = layout?.takeIf { it.isValid }
 
-    val surfaceHolder: SurfaceHolder get() = requireNotNull(surfaceView?.holder)
-    internal val screenshotSurface: SurfaceView get() = requireNotNull(surfaceView)
-    internal val screenshotTexture: TextureView? get() = textureView
+    val surfaceHolder: SurfaceHolder get() = surfaceView.holder
+    internal val screenshotSurface: SurfaceView get() = surfaceView
 
     /** Adjustment in pixels applied to a touch before mapping; negative moves it up and left. */
     var touchOffsetX: Float = 0f
@@ -208,36 +169,6 @@ class ScrcpyMirrorView @JvmOverloads constructor(
             updateGestureExclusion()
         }
 
-    /** Corner radius applied to the view and surface outline in floating mirror window mode. */
-    var cornerRadiusPx: Float = 0f
-        set(value) {
-            val next = if (value.isFinite()) value.coerceAtLeast(0f) else 0f
-            if (field == next) return
-            field = next
-            updateCornerOutline()
-        }
-
-    private val roundedOutlineProvider = object : ViewOutlineProvider() {
-        override fun getOutline(view: View, outline: Outline) {
-            val radius = cornerRadiusPx.coerceAtMost(minOf(view.width, view.height) / 2f)
-            if (view.width > 0 && view.height > 0 && radius > 0f) {
-                outline.setRoundRect(0, 0, view.width, view.height, radius)
-            } else {
-                outline.setRect(0, 0, view.width, view.height)
-            }
-        }
-    }
-
-    private fun updateCornerOutline() {
-        val rounded = cornerRadiusPx > 0f
-        outlineProvider = if (rounded) roundedOutlineProvider else ViewOutlineProvider.BACKGROUND
-        clipToOutline = rounded
-        renderView.outlineProvider = if (rounded) roundedOutlineProvider else ViewOutlineProvider.BACKGROUND
-        renderView.clipToOutline = rounded
-        invalidateOutline()
-        renderView.invalidateOutline()
-    }
-
     private var videoWidth = 0
     private var videoHeight = 0
     var captureGeneration = 0L
@@ -260,28 +191,10 @@ class ScrcpyMirrorView @JvmOverloads constructor(
     /** Notified whenever the magnification changes, so the UI can show and offer to reset it. */
     var onZoomChanged: ((Float) -> Unit)? = null
 
-    /** True while a multi-finger gesture is moving or pinching the picture instead of reaching the device. */
+    /** True while two fingers are moving the zoomed picture instead of reaching the device. */
     private var panning = false
-    private var pinching = false
-    private var localSinglePanActive = false
     private var panAnchorX = 0f
     private var panAnchorY = 0f
-    private var pinchInitialSpan = 0f
-    private var pinchAnchorSpan = 0f
-    private var singleDownX = 0f
-    private var singleDownY = 0f
-    private var singleLastTapTime = 0L
-    private var singleLastTapX = 0f
-    private var singleLastTapY = 0f
-    private var singleTapEligible = false
-    private var twoFingerDownTime = 0L
-    private var twoFingerAnchorX = 0f
-    private var twoFingerAnchorY = 0f
-    private var twoFingerTapEligible = false
-    private var lastTwoFingerTapTime = 0L
-    private var lastTwoFingerTapX = 0f
-    private var lastTwoFingerTapY = 0f
-    private var zoomAnimator: ValueAnimator? = null
 
     /** The rectangle the surface occupies; also the authority for touch mapping. */
     private var layout: VideoLayout? = null
@@ -304,26 +217,7 @@ class ScrcpyMirrorView @JvmOverloads constructor(
     private data class Sample(val packed: Long, val pressure: Int)
 
     init {
-        textureView?.surfaceTextureListener = object : TextureView.SurfaceTextureListener {
-            override fun onSurfaceTextureAvailable(surfaceTexture: SurfaceTexture, width: Int, height: Int) {
-                activeTextureSurface?.release()
-                val surface = Surface(surfaceTexture)
-                activeTextureSurface = surface
-                onTextureSurfaceAvailable?.invoke(surface)
-            }
-
-            override fun onSurfaceTextureSizeChanged(surfaceTexture: SurfaceTexture, width: Int, height: Int) = Unit
-
-            override fun onSurfaceTextureDestroyed(surfaceTexture: SurfaceTexture): Boolean {
-                onTextureSurfaceDestroyed?.invoke()
-                activeTextureSurface?.release()
-                activeTextureSurface = null
-                return true
-            }
-
-            override fun onSurfaceTextureUpdated(surfaceTexture: SurfaceTexture) = Unit
-        }
-        addView(renderView)
+        addView(surfaceView)
         setWillNotDraw(true)
     }
 
@@ -336,7 +230,8 @@ class ScrcpyMirrorView @JvmOverloads constructor(
         lastSent.clear()
         // The pad's held press is among those the session releases; its cursor keeps its place.
         pad.resize(videoWidth, videoHeight, width, height)
-        resetLocalGestureTracking()
+        gestureStarted = false
+        panning = false
         suppressedMouseGesture = false
         captureGeneration = generation
         videoWidth = width
@@ -362,21 +257,17 @@ class ScrcpyMirrorView @JvmOverloads constructor(
         // ends up even if the parent hands us bounds that differ from what we measured.
         val geometry = measureSurface(r - l, b - t)
         if (!geometry.isValid) {
-            renderView.layout(0, 0, 0, 0)
+            surfaceView.layout(0, 0, 0, 0)
             return
         }
         val left = geometry.contentLeft.toInt()
         val top = geometry.contentTop.toInt()
-        renderView.layout(
+        surfaceView.layout(
             left,
             top,
             left + geometry.contentWidth.toInt(),
             top + geometry.contentHeight.toInt(),
         )
-        if (cornerRadiusPx > 0f) {
-            invalidateOutline()
-            renderView.invalidateOutline()
-        }
         onGeometryChanged?.invoke(geometry)
         // Posted like the geometry above: a cursor that moved with the picture is reported once
         // layout has finished, not from inside it.
@@ -387,7 +278,7 @@ class ScrcpyMirrorView @JvmOverloads constructor(
     private fun measureSurface(width: Int, height: Int): VideoLayout {
         val geometry = VideoLayout.fitCentered(width, height, videoWidth, videoHeight, zoom, panX, panY)
         layout = geometry
-        renderView.measure(
+        surfaceView.measure(
             MeasureSpec.makeMeasureSpec(geometry.contentWidth.toInt(), MeasureSpec.EXACTLY),
             MeasureSpec.makeMeasureSpec(geometry.contentHeight.toInt(), MeasureSpec.EXACTLY),
         )
@@ -401,8 +292,7 @@ class ScrcpyMirrorView @JvmOverloads constructor(
      * a stale offset would make the next zoom-in jump somewhere the user did not leave it.
      */
     fun setZoom(value: Float) {
-        cancelZoomAnimator()
-        val next = VideoLayout.sanitizeZoom(value)
+        val next = VideoLayout.fitCentered(width, height, videoWidth, videoHeight, value).zoom
         if (next == 1f) applyTransform(1f, 0f, 0f) else applyTransform(next, panX, panY)
         // Zooming in about the centre can leave the cursor off screen; the picture follows it.
         if (precisionPad) revealCursor()
@@ -412,105 +302,11 @@ class ScrcpyMirrorView @JvmOverloads constructor(
     fun zoomBy(factor: Float) = setZoom(zoom * factor)
 
     /** Returns to the fitted, centred picture. */
-    fun resetZoom() {
-        cancelZoomAnimator()
-        applyTransform(1f, 0f, 0f)
-    }
-
-    /** Alias matching UI "Fit to Screen" semantics: resets zoom to 1x and centers video. */
-    fun fitToScreen() = resetZoom()
-
-    internal val isZoomAnimating: Boolean get() = zoomAnimator?.isRunning == true
-    internal val isZoomGestureActive: Boolean get() = pinching || panning
-
-    /**
-     * Smoothly animates magnification toward [targetZoom] around ([focusX], [focusY]) in view
-     * pixels, falling back to an immediate update when animations are disabled.
-     */
-    fun animateZoomTo(
-        targetZoom: Float,
-        focusX: Float = width / 2f,
-        focusY: Float = height / 2f,
-    ) {
-        cancelZoomAnimator()
-        val target = VideoLayout.sanitizeZoom(targetZoom)
-        if (abs(target - zoom) < 0.001f) {
-            if (target == 1f) applyTransform(1f, 0f, 0f)
-            return
-        }
-        if (!ValueAnimator.areAnimatorsEnabled() || !isAttachedToWindow || width <= 0 || height <= 0) {
-            if (target == 1f) applyTransform(1f, 0f, 0f) else applyFocalTransform(target, focusX, focusY)
-            return
-        }
-        val startZoom = zoom
-        val startPanX = panX
-        val startPanY = panY
-        val fx = if (focusX.isFinite()) focusX else width / 2f
-        val fy = if (focusY.isFinite()) focusY else height / 2f
-        zoomAnimator = ValueAnimator.ofFloat(startZoom, target).apply {
-            duration = ZOOM_ANIM_DURATION_MS
-            interpolator = DecelerateInterpolator()
-            addUpdateListener { anim ->
-                val currentZ = anim.animatedValue as Float
-                if (target <= 1f && currentZ <= 1.01f && anim.animatedFraction >= 0.99f) {
-                    applyTransform(1f, 0f, 0f)
-                } else {
-                    val (nx, ny) = VideoLayout.computeFocalZoomPan(
-                        viewWidth = width,
-                        viewHeight = height,
-                        videoWidth = videoWidth,
-                        videoHeight = videoHeight,
-                        oldZoom = startZoom,
-                        newZoom = currentZ,
-                        oldPanX = startPanX,
-                        oldPanY = startPanY,
-                        oldFocusX = fx,
-                        oldFocusY = fy,
-                    )
-                    applyTransform(currentZ, nx, ny)
-                }
-            }
-            start()
-        }
-    }
-
-    private fun cancelZoomAnimator() {
-        zoomAnimator?.cancel()
-        zoomAnimator = null
-    }
-
-    private fun applyFocalTransform(
-        newZoom: Float,
-        oldFocusX: Float,
-        oldFocusY: Float,
-        newFocusX: Float = oldFocusX,
-        newFocusY: Float = oldFocusY,
-    ) {
-        val target = VideoLayout.sanitizeZoom(newZoom)
-        if (target <= 1f) {
-            applyTransform(1f, 0f, 0f)
-            return
-        }
-        val (nx, ny) = VideoLayout.computeFocalZoomPan(
-            viewWidth = width,
-            viewHeight = height,
-            videoWidth = videoWidth,
-            videoHeight = videoHeight,
-            oldZoom = zoom,
-            newZoom = target,
-            oldPanX = panX,
-            oldPanY = panY,
-            oldFocusX = oldFocusX,
-            oldFocusY = oldFocusY,
-            newFocusX = newFocusX,
-            newFocusY = newFocusY,
-        )
-        applyTransform(target, nx, ny)
-    }
+    fun resetZoom() = applyTransform(1f, 0f, 0f)
 
     private fun applyTransform(newZoom: Float, newPanX: Float, newPanY: Float) {
-        val z = VideoLayout.sanitizeZoom(newZoom)
-        val fitted = VideoLayout.fitCentered(width, height, videoWidth, videoHeight, z)
+        val fitted = VideoLayout.fitCentered(width, height, videoWidth, videoHeight, newZoom)
+        val z = fitted.zoom
         val px = if (z <= 1f) 0f else VideoLayout.clampPan(width.toFloat(), fitted.contentWidth, newPanX)
         val py = if (z <= 1f) 0f else VideoLayout.clampPan(height.toFloat(), fitted.contentHeight, newPanY)
         if (z == zoom && px == panX && py == panY) return
@@ -530,16 +326,7 @@ class ScrcpyMirrorView @JvmOverloads constructor(
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
         super.onSizeChanged(w, h, oldw, oldh)
-        if (oldw > 0 && oldh > 0 && w > 0 && h > 0 && (w != oldw || h != oldh) && zoom > 1f) {
-            val scaledX = panX * (w.toFloat() / oldw.toFloat())
-            val scaledY = panY * (h.toFloat() / oldh.toFloat())
-            val fitted = VideoLayout.fitCentered(w, h, videoWidth, videoHeight, zoom)
-            panX = VideoLayout.clampPan(w.toFloat(), fitted.contentWidth, scaledX)
-            panY = VideoLayout.clampPan(h.toFloat(), fitted.contentHeight, scaledY)
-            layout = null
-        }
         updateGestureExclusion()
-        if (cornerRadiusPx > 0f) invalidateOutline()
     }
 
     /**
@@ -579,7 +366,8 @@ class ScrcpyMirrorView @JvmOverloads constructor(
         // and release nothing at all. `releaseAllPointers` uses each pointer's own last position,
         // so none of them is released somewhere it never was.
         if (event.actionMasked == MotionEvent.ACTION_CANCEL) {
-            resetLocalGestureTracking()
+            gestureStarted = false
+            panning = false
             suppressedMouseGesture = false
             releaseAllPointers()
             padChanged()
@@ -597,9 +385,8 @@ class ScrcpyMirrorView @JvmOverloads constructor(
             return true
         }
 
-        val isMouse = event.isFromSource(InputDevice.SOURCE_MOUSE)
-        if (!isMouse && handleZoomOrPanGesture(event)) return true
-        if (localZoomMode || inputState.locked) return true
+        if (handlePanGesture(event)) return true
+        if (inputState.locked) return true
 
         val geometry = currentLayout() ?: return false
 
@@ -651,8 +438,8 @@ class ScrcpyMirrorView @JvmOverloads constructor(
 
     override fun onDetachedFromWindow() {
         super.onDetachedFromWindow()
-        cancelZoomAnimator()
-        resetLocalGestureTracking()
+        gestureStarted = false
+        panning = false
         releaseAllPointers()
     }
 
@@ -758,16 +545,6 @@ class ScrcpyMirrorView @JvmOverloads constructor(
         if (!event.isFromSource(InputDevice.SOURCE_CLASS_POINTER)) {
             return super.onGenericMotionEvent(event)
         }
-        if (event.actionMasked == MotionEvent.ACTION_SCROLL &&
-            (event.metaState and KeyEvent.META_CTRL_ON) != 0
-        ) {
-            val vertical = event.getAxisValue(MotionEvent.AXIS_VSCROLL)
-            if (vertical != 0f) {
-                val factor = if (vertical > 0f) 1.15f else 1f / 1.15f
-                applyFocalTransform(zoom * factor, event.x, event.y)
-                return true
-            }
-        }
         if (inputState.locked) return true
         // Button presses arrive here rather than through onTouchEvent, because a button state
         // change is not one of Android's touch actions.
@@ -806,226 +583,47 @@ class ScrcpyMirrorView @JvmOverloads constructor(
         releasePointers(videoWidth, videoHeight)
     }
 
-    private fun resetLocalGestureTracking() {
-        gestureStarted = false
-        panning = false
-        pinching = false
-        localSinglePanActive = false
-        pinchInitialSpan = 0f
-        pinchAnchorSpan = 0f
-        singleTapEligible = false
-        twoFingerTapEligible = false
-    }
-
-    /**
-     * Handles local pinch-to-zoom, 2-finger pan, 1-finger pan when [localZoomMode] or locked,
-     * and double-tap Fit/Zoom toggling without interfering with normal remote single-touch or
-     * small remote multi-touch gestures.
-     *
-     * @return true when the event is consumed locally and must not be forwarded to the remote device.
-     */
-    private fun handleZoomOrPanGesture(event: MotionEvent): Boolean {
-        val localOnly = localZoomMode || inputState.locked
+    private fun handlePanGesture(event: MotionEvent): Boolean {
+        if (zoom <= 1f && !panning) return false
         when (event.actionMasked) {
-            MotionEvent.ACTION_DOWN -> {
-                panning = false
-                pinching = false
-                localSinglePanActive = false
-                pinchInitialSpan = 0f
-                pinchAnchorSpan = 0f
-                twoFingerTapEligible = false
-                singleDownX = event.getX(0)
-                singleDownY = event.getY(0)
-                panAnchorX = singleDownX
-                panAnchorY = singleDownY
-                singleTapEligible = localOnly
-                return localOnly
-            }
-
             MotionEvent.ACTION_POINTER_DOWN -> {
-                singleTapEligible = false
-                localSinglePanActive = false
-                if (event.pointerCount == 2) {
-                    val cx = centroidX(event, ignoring = -1)
-                    val cy = centroidY(event, ignoring = -1)
-                    val span = pointerSpan(event, ignoring = -1)
-                    if (!twoFingerTapEligible) {
-                        twoFingerDownTime = event.eventTime
-                        twoFingerAnchorX = cx
-                        twoFingerAnchorY = cy
-                        twoFingerTapEligible = true
-                    }
-                    pinchInitialSpan = span
-                    pinchAnchorSpan = span
-                    panAnchorX = cx
-                    panAnchorY = cy
-                } else {
-                    twoFingerTapEligible = false
+                if (!panning) {
+                    panning = true
+                    releaseDirectPointers()
                 }
-                if (zoom > 1f || localOnly) {
-                    if (!panning) {
-                        panning = true
-                        releaseDirectPointers()
-                    }
-                    anchorPan(event, ignoring = -1)
-                    return true
-                }
-                // At zoom == 1f while unlocked & !localZoomMode: observe span before hijacking so small
-                // remote multitouch gestures still reach the remote device unmodified.
-                return false
+                anchorPan(event, ignoring = -1)
+                return true
             }
 
             MotionEvent.ACTION_MOVE -> {
-                if (event.pointerCount >= 2) {
-                    val cx = centroidX(event, ignoring = -1)
-                    val cy = centroidY(event, ignoring = -1)
-                    val span = pointerSpan(event, ignoring = -1)
-                    if (twoFingerTapEligible && hypot(cx - twoFingerAnchorX, cy - twoFingerAnchorY) > scaledTouchSlop) {
-                        twoFingerTapEligible = false
-                    }
-                    if (!pinching && pinchInitialSpan >= minPinchSpanPx && span >= minPinchSpanPx) {
-                        val delta = abs(span - pinchInitialSpan)
-                        val rel = abs(span / pinchInitialSpan - 1f)
-                        if (delta >= pinchSlopPx && (panning || rel >= PINCH_START_RATIO_THRESHOLD)) {
-                            pinching = true
-                            panning = true
-                            twoFingerTapEligible = false
-                            releaseDirectPointers()
-                            pinchAnchorSpan = span
-                            panAnchorX = cx
-                            panAnchorY = cy
-                            return true
-                        }
-                    }
-                    if (pinching) {
-                        val nextZoom = if (pinchAnchorSpan >= minPinchSpanPx && span >= minPinchSpanPx) {
-                            zoom * (span / pinchAnchorSpan)
-                        } else {
-                            zoom
-                        }
-                        applyFocalTransform(
-                            newZoom = nextZoom,
-                            oldFocusX = panAnchorX,
-                            oldFocusY = panAnchorY,
-                            newFocusX = cx,
-                            newFocusY = cy,
-                        )
-                        pinchAnchorSpan = span
-                        panAnchorX = cx
-                        panAnchorY = cy
-                        return true
-                    }
-                    if (panning) {
-                        applyTransform(zoom, panX + (cx - panAnchorX), panY + (cy - panAnchorY))
-                        panAnchorX = cx
-                        panAnchorY = cy
-                        return true
-                    }
-                    return localOnly
-                } else if (panning) {
-                    return true
-                } else if (localOnly) {
-                    val x = event.getX(0)
-                    val y = event.getY(0)
-                    if (!localSinglePanActive && hypot(x - singleDownX, y - singleDownY) > scaledTouchSlop) {
-                        localSinglePanActive = true
-                        singleTapEligible = false
-                        panAnchorX = x
-                        panAnchorY = y
-                    }
-                    if (localSinglePanActive && zoom > 1f) {
-                        applyTransform(zoom, panX + (x - panAnchorX), panY + (y - panAnchorY))
-                        panAnchorX = x
-                        panAnchorY = y
-                    }
-                    return true
-                }
-                return false
+                if (!panning) return false
+                if (event.pointerCount < 2) return true
+                val x = centroidX(event, ignoring = -1)
+                val y = centroidY(event, ignoring = -1)
+                applyTransform(zoom, panX + (x - panAnchorX), panY + (y - panAnchorY))
+                panAnchorX = x
+                panAnchorY = y
+                return true
             }
 
             MotionEvent.ACTION_POINTER_UP -> {
-                if (twoFingerTapEligible) {
-                    if (event.eventTime - twoFingerDownTime > tapTimeoutMs) {
-                        twoFingerTapEligible = false
-                    }
-                }
-                if (pinching || panning) {
-                    anchorPan(event, ignoring = event.actionIndex)
-                    pinchInitialSpan = 0f
-                    pinchAnchorSpan = 0f
-                    return true
-                }
-                return localOnly
+                if (!panning) return false
+                anchorPan(event, ignoring = event.actionIndex)
+                return true
             }
 
             MotionEvent.ACTION_UP -> {
-                val handledLocal = panning || pinching || localSinglePanActive
-                if (pinching && zoom < PINCH_SNAP_TO_ONE_THRESHOLD) {
-                    applyTransform(1f, 0f, 0f)
-                }
-                if (localOnly && singleTapEligible && !handledLocal &&
-                    event.eventTime - event.downTime <= tapTimeoutMs
-                ) {
-                    val dt = event.eventTime - singleLastTapTime
-                    val dist = hypot(singleDownX - singleLastTapX, singleDownY - singleLastTapY)
-                    if (singleLastTapTime != 0L && dt in 1L..doubleTapTimeoutMs && dist <= scaledDoubleTapSlop) {
-                        singleLastTapTime = 0L
-                        val targetZoom = if (zoom > DOUBLE_TAP_ACTIVE_THRESHOLD) 1f else DOUBLE_TAP_ZOOM
-                        animateZoomTo(targetZoom, singleDownX, singleDownY)
-                    } else {
-                        singleLastTapTime = event.eventTime
-                        singleLastTapX = singleDownX
-                        singleLastTapY = singleDownY
-                    }
-                } else if (!localOnly && twoFingerTapEligible && !pinching &&
-                    event.eventTime - twoFingerDownTime <= tapTimeoutMs
-                ) {
-                    val dt = event.eventTime - lastTwoFingerTapTime
-                    val dist = hypot(twoFingerAnchorX - lastTwoFingerTapX, twoFingerAnchorY - lastTwoFingerTapY)
-                    if (lastTwoFingerTapTime != 0L && dt in 1L..doubleTapTimeoutMs && dist <= scaledDoubleTapSlop) {
-                        lastTwoFingerTapTime = 0L
-                        releaseDirectPointers()
-                        val targetZoom = if (zoom > DOUBLE_TAP_ACTIVE_THRESHOLD) 1f else DOUBLE_TAP_ZOOM
-                        animateZoomTo(targetZoom, twoFingerAnchorX, twoFingerAnchorY)
-                    } else {
-                        lastTwoFingerTapTime = event.eventTime
-                        lastTwoFingerTapX = twoFingerAnchorX
-                        lastTwoFingerTapY = twoFingerAnchorY
-                    }
-                }
+                if (!panning) return false
                 panning = false
-                pinching = false
-                localSinglePanActive = false
-                singleTapEligible = false
-                twoFingerTapEligible = false
-                pinchInitialSpan = 0f
-                pinchAnchorSpan = 0f
-                return handledLocal || localOnly
+                return true
             }
         }
-        return panning || pinching || localOnly
+        return panning
     }
 
     private fun anchorPan(event: MotionEvent, ignoring: Int) {
         panAnchorX = centroidX(event, ignoring)
         panAnchorY = centroidY(event, ignoring)
-    }
-
-    private fun pointerSpan(event: MotionEvent, ignoring: Int): Float {
-        var firstX = Float.NaN
-        var firstY = Float.NaN
-        for (index in 0 until event.pointerCount) {
-            if (index == ignoring) continue
-            val x = event.getX(index)
-            val y = event.getY(index)
-            if (firstX.isNaN()) {
-                firstX = x
-                firstY = y
-            } else {
-                return hypot(x - firstX, y - firstY)
-            }
-        }
-        return 0f
     }
 
     private fun centroidX(event: MotionEvent, ignoring: Int): Float {
@@ -1165,24 +763,6 @@ class ScrcpyMirrorView @JvmOverloads constructor(
 
         /** Two-finger travel that scrolls by one wheel step on the pad. */
         const val PAD_SCROLL_STEP_DP = 48f
-
-        /** Minimum pinch span change in dp before two fingers promote to local zoom/pan. */
-        const val PINCH_SLOP_DP = 28f
-
-        /** Minimum two-finger separation in dp required to compute a stable pinch scale. */
-        const val MIN_PINCH_SPAN_DP = 24f
-
-        /** Minimum relative scale delta (8%) at zoom 1x so small remote pinches pass untouched. */
-        const val PINCH_START_RATIO_THRESHOLD = 0.08f
-
-        /** Hysteresis threshold below which releasing a pinch snaps cleanly back to 1x Fit. */
-        const val PINCH_SNAP_TO_ONE_THRESHOLD = 1.03f
-
-        /** Double-tap target magnification and threshold above which double-tap returns to 1x. */
-        const val DOUBLE_TAP_ZOOM = 2f
-        const val DOUBLE_TAP_ACTIVE_THRESHOLD = 1.05f
-
-        const val ZOOM_ANIM_DURATION_MS = 180L
 
         /** How close to the edge of the view a magnified picture lets the cursor come. */
         const val PAD_REVEAL_MARGIN_DP = 48f

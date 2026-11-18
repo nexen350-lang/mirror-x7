@@ -357,28 +357,4 @@
     <string name="onboarding_back">Back</string>
     <string name="onboarding_skip">Skip</string>
     <string name="onboarding_done">Get started</string>
-    <string name="mirror_window_drag_handle">Move mirror window</string>
-    <string name="mirror_window_resize_handle">Resize mirror window</string>
-    <string name="overlay_permission_title">Floating mirror window</string>
-    <string name="overlay_permission_body">Allow \"Display over other apps\" to show the mirrored phone in a standalone floating window over your home screen and other apps.\n\nIf you decline, mirroring continues inside this app.</string>
-    <string name="overlay_permission_allow">Allow permission</string>
-    <string name="overlay_permission_fallback">Stay in app</string>
-    <string name="overlay_permission_unavailable">Could not open overlay permission settings; continuing in app.</string>
-    <string name="overlay_active_title">Mirroring in floating window</string>
-    <string name="overlay_active_body">The remote screen is floating over your apps so you can drag, resize, and multitask freely.</string>
-    <string name="overlay_hide_app">Return to background</string>
-    <string name="overlay_switch_in_app">Switch to in-app view</string>
-
-    <!-- Tablet mirroring floating control strip & window modes -->
-    <string name="mirror_control_zoom_in">Zoom in</string>
-    <string name="mirror_control_zoom_out">Zoom out</string>
-    <string name="mirror_control_reset_zoom">Reset zoom (%1$.1f×)</string>
-    <string name="mirror_control_fit_screen">Fit to screen</string>
-    <string name="mirror_control_pan_mode">Pan and zoom gestures</string>
-    <string name="mirror_control_maximize">Maximize window</string>
-    <string name="mirror_control_restore_window">Restore window</string>
-    <string name="mirror_control_fullscreen">Fullscreen</string>
-    <string name="mirror_control_exit_fullscreen">Exit fullscreen</string>
-    <string name="mirror_control_disconnect">Disconnect</string>
-    <string name="mirror_control_wake_strip">Show mirror controls</string>
 </resources>
