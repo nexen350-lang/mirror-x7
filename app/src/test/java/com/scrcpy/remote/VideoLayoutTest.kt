@@ -288,9 +288,13 @@ class VideoLayoutTest {
         for (bad in listOf(Float.NaN, Float.POSITIVE_INFINITY, 0f, -3f)) {
             val layout = VideoLayout.fitCentered(1000, 1000, 500, 1000, bad, 0f, 0f)
             assertTrue("zoom=$bad produced an invalid layout", layout.isValid)
+            assertEquals(1f, layout.zoom, 0f)
         }
+        assertEquals(VideoLayout.MAX_ZOOM, VideoLayout.fitCentered(1000, 1000, 500, 1000, 99f, 0f, 0f).zoom, 0f)
+        assertEquals(2f, VideoLayout.fitCentered(0, 0, 500, 1000, 2f, 0f, 0f).zoom, 0f)
         val nanPan = VideoLayout.fitCentered(1000, 1000, 500, 1000, 2f, Float.NaN, Float.NaN)
         assertTrue(nanPan.isValid)
+        assertEquals(2f, nanPan.zoom, 0f)
         assertTrue(nanPan.contentLeft.isFinite() && nanPan.contentTop.isFinite())
     }
 }

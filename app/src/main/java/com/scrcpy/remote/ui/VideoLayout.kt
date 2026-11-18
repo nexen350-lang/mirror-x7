@@ -22,6 +22,7 @@ data class VideoLayout(
     val contentHeight: Float,
     val videoWidth: Int,
     val videoHeight: Int,
+    val zoom: Float = 1f,
 ) {
     val isValid: Boolean =
         contentWidth > 0f && contentHeight > 0f && videoWidth > 0 && videoHeight > 0
@@ -94,8 +95,9 @@ data class VideoLayout(
             panX: Float = 0f,
             panY: Float = 0f,
         ): VideoLayout {
+            val magnification = sanitizeZoom(zoom)
             if (viewWidth <= 0 || viewHeight <= 0 || videoWidth <= 0 || videoHeight <= 0) {
-                return VideoLayout(0f, 0f, 0f, 0f, videoWidth, videoHeight)
+                return VideoLayout(0f, 0f, 0f, 0f, videoWidth, videoHeight, zoom = magnification)
             }
 
             val scale = min(
@@ -105,7 +107,6 @@ data class VideoLayout(
             val width = (videoWidth * scale).roundToInt().coerceIn(1, viewWidth)
             val height = (videoHeight * scale).roundToInt().coerceIn(1, viewHeight)
 
-            val magnification = sanitizeZoom(zoom)
             if (magnification == 1f) {
                 // The historical path, kept exact rather than recomputed through the zoom
                 // arithmetic: every touch-accuracy property of this class is stated against it.
@@ -118,6 +119,7 @@ data class VideoLayout(
                     contentHeight = height.toFloat(),
                     videoWidth = videoWidth,
                     videoHeight = videoHeight,
+                    zoom = 1f,
                 )
             }
 
@@ -131,6 +133,7 @@ data class VideoLayout(
                 contentHeight = zoomedHeight,
                 videoWidth = videoWidth,
                 videoHeight = videoHeight,
+                zoom = magnification,
             )
         }
 
